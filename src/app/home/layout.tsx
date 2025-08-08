@@ -5,11 +5,11 @@ import { ReactNode } from "react";
 export default function HomeLayout({ children }: { children: ReactNode }) {
   return (
     <div className="flex min-h-screen bg-gray-200">
-      <div className="w-16  ">
+      <div className="w-16 h-screen sticky top-0 ">
         <LeftNav />
       </div>
 
-      <div className="w-64  border-r border-gray-100">
+      <div className="w-64  border-r border-gray-100 h-screen sticky top-0">
         <Sidebar />
       </div>
 
