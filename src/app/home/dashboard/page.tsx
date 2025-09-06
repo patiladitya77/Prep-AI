@@ -8,8 +8,11 @@ import {
   DialogDescription,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import { useRouter } from "next/navigation";
 import { useState } from "react";
 export default function Dashboard() {
+  const router = useRouter();
+
   const [openDialog, setOpenDialog] = useState(false);
   const [jobRole, setJobRole] = useState("");
   const [jobDescription, setJobDescription] = useState("");
@@ -32,6 +35,7 @@ export default function Dashboard() {
       return;
     }
     setOpenDialog(false);
+    router.push("/interview/123");
   };
   return (
     <div className="">
