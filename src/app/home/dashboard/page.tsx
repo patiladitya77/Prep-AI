@@ -11,6 +11,28 @@ import {
 import { useState } from "react";
 export default function Dashboard() {
   const [openDialog, setOpenDialog] = useState(false);
+  const [jobRole, setJobRole] = useState("");
+  const [jobDescription, setJobDescription] = useState("");
+  const [exp, setExp] = useState("");
+  const [jobRoleReqError, setJobRoleReqError] = useState("");
+  const [jobDesReqError, setJobDesReqError] = useState("");
+  const [expReqError, setReqExpError] = useState("");
+
+  const handleStartInterview = () => {
+    if (!jobRole) {
+      setJobRoleReqError("* indicates required field");
+      return;
+    }
+    if (!jobDescription) {
+      setJobDesReqError("* indicates required field");
+      return;
+    }
+    if (!exp) {
+      setReqExpError("* indicates required field");
+      return;
+    }
+    setOpenDialog(false);
+  };
   return (
     <div className="">
       <div className="flex justify-between my-8 mx-5">
@@ -65,43 +87,49 @@ export default function Dashboard() {
               {/* Job Role */}
               <div>
                 <label className="block text-sm font-medium mb-1">
-                  Job Role/Job Position
+                  Job Role/Job Position*
                 </label>
                 <input
                   type="text"
                   placeholder="Ex. Full Stack Developer"
                   className="w-full rounded-md border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  onChange={(e) => setJobRole(e.target.value)}
                 />
+                <p className="text-red-600">{jobRoleReqError}</p>
               </div>
 
               {/* Job Description */}
               <div>
                 <label className="block text-sm font-medium mb-1">
-                  Job Description/Tech stack in short
+                  Job Description/Tech stack in short*
                 </label>
                 <textarea
                   placeholder="Ex. React, Angular, NodeJs, MongoDB, MySQL, etc."
                   rows={3}
                   className="w-full rounded-md border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  onChange={(e) => setJobDescription(e.target.value)}
                 ></textarea>
+                <p className="text-red-600">{jobDesReqError}</p>
               </div>
 
               {/* Years of Experience */}
               <div>
                 <label className="block text-sm font-medium mb-1">
-                  No. of Years of Experience
+                  No. of Years of Experience*
                 </label>
                 <input
                   type="text"
                   placeholder="Ex. 2"
                   className="w-full rounded-md border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  onChange={(e) => setExp(e.target.value)}
                 />
+                <p className="text-red-600">{expReqError}</p>
               </div>
 
               {/* Upload Resume */}
               <div>
                 <label className="block text-sm font-medium mb-1">
-                  Upload Resume
+                  Upload Resume*
                 </label>
                 <div
                   className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center cursor-pointer hover:border-blue-500 transition"
@@ -143,8 +171,8 @@ export default function Dashboard() {
               <button
                 className="px-4 py-2 bg-black text-white rounded-md"
                 onClick={() => {
+                  handleStartInterview();
                   // Start interview logic
-                  setOpenDialog(false);
                 }}
               >
                 Start Interview
