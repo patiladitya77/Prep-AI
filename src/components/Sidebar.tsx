@@ -1,6 +1,10 @@
+"use client";
+import Link from "next/link";
 import UsageProgress from "./UsageProgress";
+import { usePathname } from "next/navigation";
 
 export default function Sidebar() {
+  const pathName = usePathname();
   return (
     <div className="p-4 space-y-6 text-gray-700 text-sm bg-slate-100 rounded-lg m-2 ">
       <div className="mb-10">
@@ -9,23 +13,32 @@ export default function Sidebar() {
         </div>
         <ul className="space-y-2">
           <li className="hover:bg-gray-100 px-2 py-1 rounded">
-            <div className="flex">
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                fill="none"
-                viewBox="0 0 24 24"
-                strokeWidth={1.5}
-                stroke="currentColor"
-                className="size-4 my-0.5"
+            <Link href="/home/dashboard">
+              <div
+                className={`flex py-2 rounded-md cursor-pointer 
+          ${
+            pathName.startsWith("/home/dashboard")
+              ? "bg-gray-200 text-gray-800 font-semibold"
+              : "text-gray-700 hover:bg-gray-50"
+          }`}
               >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="M12 18.75a6 6 0 0 0 6-6v-1.5m-6 7.5a6 6 0 0 1-6-6v-1.5m6 7.5v3.75m-3.75 0h7.5M12 15.75a3 3 0 0 1-3-3V4.5a3 3 0 1 1 6 0v8.25a3 3 0 0 1-3 3Z"
-                />
-              </svg>
-              <p className="mx-1">AI Interviews</p>
-            </div>
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  strokeWidth={1.5}
+                  stroke="currentColor"
+                  className="size-4 my-0.5"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M12 18.75a6 6 0 0 0 6-6v-1.5m-6 7.5a6 6 0 0 1-6-6v-1.5m6 7.5v3.75m-3.75 0h7.5M12 15.75a3 3 0 0 1-3-3V4.5a3 3 0 1 1 6 0v8.25a3 3 0 0 1-3 3Z"
+                  />
+                </svg>
+                <p className="mx-1">AI Interviews</p>
+              </div>
+            </Link>
           </li>
           <li className="hover:bg-gray-100 px-2 py-1 rounded">
             <div className="flex">
@@ -53,23 +66,32 @@ export default function Sidebar() {
         <div className="text-gray-500 uppercase text-xs mb-2">Insights</div>
         <ul className="space-y-2">
           <li className="hover:bg-gray-100 px-2 py-1 rounded">
-            <div className="flex">
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                fill="none"
-                viewBox="0 0 24 24"
-                strokeWidth={1.5}
-                stroke="currentColor"
-                className="size-4 my-0.5"
+            <Link href="/home/analysis">
+              <div
+                className={`flex py-2 rounded-md cursor-pointer 
+          ${
+            pathName.startsWith("/home/analysis")
+              ? "bg-gray-200 text-gray-800 font-semibold"
+              : "text-gray-700 hover:bg-gray-50"
+          }`}
               >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="M7.5 14.25v2.25m3-4.5v4.5m3-6.75v6.75m3-9v9M6 20.25h12A2.25 2.25 0 0 0 20.25 18V6A2.25 2.25 0 0 0 18 3.75H6A2.25 2.25 0 0 0 3.75 6v12A2.25 2.25 0 0 0 6 20.25Z"
-                />
-              </svg>
-              <p className="mx-1">Analysis</p>
-            </div>
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  strokeWidth={1.5}
+                  stroke="currentColor"
+                  className="size-4 my-0.5"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M7.5 14.25v2.25m3-4.5v4.5m3-6.75v6.75m3-9v9M6 20.25h12A2.25 2.25 0 0 0 20.25 18V6A2.25 2.25 0 0 0 18 3.75H6A2.25 2.25 0 0 0 3.75 6v12A2.25 2.25 0 0 0 6 20.25Z"
+                  />
+                </svg>
+                <p className="mx-1">Analysis</p>
+              </div>
+            </Link>
           </li>
           <li className="hover:bg-gray-100 px-2 py-1 rounded">
             <div className="flex">
