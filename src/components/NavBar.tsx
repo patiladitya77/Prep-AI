@@ -1,9 +1,17 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import React from "react";
 
 // Import your NavBar component
 const NavBar = () => {
+  const router = useRouter();
+  const handleGoToLogin = () => {
+    router.push("/login");
+  };
+  const handleGoToSignup = () => {
+    router.push("/signup");
+  };
   return (
     <nav className="fixed top-0 left-0 right-0 z-50 bg-white/90 backdrop-blur-md border-b border-gray-200">
       <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
@@ -66,10 +74,16 @@ const NavBar = () => {
 
         {/* Auth Buttons */}
         <div className="flex items-center space-x-4">
-          <button className="text-gray-600 hover:text-gray-900 transition-colors">
+          <button
+            className="text-gray-600 hover:text-gray-900 transition-colors cursor-pointer"
+            onClick={handleGoToLogin}
+          >
             Log in
           </button>
-          <button className="bg-black text-white px-4 py-2 rounded-md hover:bg-gray-800 transition-colors">
+          <button
+            className="bg-black text-white px-4 py-2 rounded-md hover:bg-gray-800 transition-colors cursor-pointer"
+            onClick={handleGoToSignup}
+          >
             Sign up
           </button>
         </div>

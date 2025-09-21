@@ -2,8 +2,13 @@
 
 import NavBar from "@/components/NavBar";
 import { AnimatePresence, motion } from "framer-motion";
+import { useRouter } from "next/navigation";
 
 export default function Home() {
+  const router = useRouter();
+  const handleGoToSignup = () => {
+    router.push("/signup");
+  };
   return (
     <>
       <NavBar />
@@ -60,7 +65,10 @@ export default function Home() {
                   transition={{ delay: 0.6, duration: 0.6 }}
                   className="flex flex-col sm:flex-row gap-4 justify-center mb-16"
                 >
-                  <button className="bg-black text-white px-8 py-3 rounded-md font-medium hover:bg-gray-800 transition-colors">
+                  <button
+                    className="bg-black cursor-pointer text-white px-8 py-3 rounded-md font-medium hover:bg-gray-800 transition-colors"
+                    onClick={handleGoToSignup}
+                  >
                     Start for free
                   </button>
                   <button
