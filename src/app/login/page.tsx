@@ -1,15 +1,18 @@
 "use client";
+import { useRouter } from "next/navigation";
 import React, { useState } from "react";
 
 export default function Login() {
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
+  const [email, setEmail] = useState("aditya@gmail.com");
+  const [password, setPassword] = useState("Aditya@2005");
   const [errorMessage, setErrorMessage] = useState("");
+  const router = useRouter();
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     console.log("Login flow", { email, password });
     // Add your login logic here
+    router.push("/home/dashboard");
   };
 
   return (
