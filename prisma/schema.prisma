@@ -1,0 +1,99 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id                String             @id @default(cuid())
+  name              String?
+  email             String             @unique
+  passwordHash      String             @map("password_hash")
+  subscriptionPlan  String?            @map("subscription_plan")
+  interviewAttempts Int                @default(0) @map("interview_attempts")
+  createdAt         DateTime           @default(now()) @map("created_at")
+  updatedAt         DateTime           @updatedAt @map("updated_at")
+  interviewSessions InterviewSession[]
+  jobDescriptions   JD[]
+  resumes           Resume[]
+
+  @@map("users")
+}
+
+model Resume {
+  id                String             @id @default(cuid())
+  userId            String             @map("user_id")
+  parsedData        Json?              @map("parsed_data")
+  createdAt         DateTime           @default(now()) @map("created_at")
+  updatedAt         DateTime           @updatedAt @map("updated_at")
+  file_name         String
+  file_path         String?
+  interviewSessions InterviewSession[]
+  user              User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("resumes")
+}
+
+model JD {
+  id                String             @id @default(cuid())
+  userId            String             @map("user_id")
+  parsedData        Json               @map("parsed_data")
+  createdAt         DateTime           @default(now()) @map("created_at")
+  updatedAt         DateTime           @updatedAt @map("updated_at")
+  interviewSessions InterviewSession[]
+  user              User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("job_descriptions")
+}
+
+model InterviewSession {
+  id        String                 @id @default(cuid())
+  userId    String                 @map("user_id")
+  resumeId  String?                @map("resume_id")
+  jdId      String                 @map("jd_id")
+  status    InterviewSessionStatus @default(ACTIVE)
+  score     Float?
+  feedback  String?
+  startedAt DateTime               @default(now()) @map("started_at")
+  endedAt   DateTime?              @map("ended_at")
+  answers   Answer[]
+  jd        JD                     @relation(fields: [jdId], references: [id], onDelete: Cascade)
+  resume    Resume?                @relation(fields: [resumeId], references: [id], onDelete: Cascade)
+  user      User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  questions Question[]
+
+  @@map("interview_sessions")
+}
+
+model Question {
+  id           String           @id @default(cuid())
+  sessionId    String           @map("session_id")
+  questionText String           @map("question_text")
+  order        Int
+  createdAt    DateTime         @default(now()) @map("created_at")
+  answers      Answer[]
+  session      InterviewSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@map("questions")
+}
+
+model Answer {
+  id              String           @id @default(cuid())
+  sessionId       String           @map("session_id")
+  questionId      String           @map("question_id")
+  candidateAnswer String           @map("candidate_answer")
+  submittedAt     DateTime         @default(now()) @map("submitted_at")
+  question        Question         @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  session         InterviewSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@map("answers")
+}
+
+enum InterviewSessionStatus {
+  ACTIVE
+  COMPLETED
+  ABANDONED
+}
