@@ -1,5 +1,5 @@
-import LeftNav from "@/components/LeftNav";
-import Sidebar from "@/components/Sidebar";
+import LeftNav from "@/components/navigation/LeftNav";
+import Sidebar from "@/components/navigation/Sidebar";
 import { ReactNode } from "react";
 
 export default function HomeLayout({ children }: { children: ReactNode }) {

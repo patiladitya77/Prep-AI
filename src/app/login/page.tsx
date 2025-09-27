@@ -1,18 +1,58 @@
 "use client";
 import { useRouter } from "next/navigation";
 import React, { useState } from "react";
+import toast from "react-hot-toast";
 
 export default function Login() {
-  const [email, setEmail] = useState("aditya@gmail.com");
-  const [password, setPassword] = useState("Aditya@2005");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [errorMessage, setErrorMessage] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
   const router = useRouter();
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    console.log("Login flow", { email, password });
-    // Add your login logic here
-    router.push("/home/dashboard");
+    setIsLoading(true);
+    setErrorMessage("");
+    toast.loading("🔐 Logging in...", { id: "login-progress" });
+
+    try {
+      const response = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ email, password }),
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        // Store the token in localStorage
+        localStorage.setItem("authToken", data.data.token);
+        localStorage.setItem("user", JSON.stringify(data.data.user));
+
+        toast.success("✅ Login successful! Welcome back!", {
+          id: "login-progress",
+        });
+        router.push("/home/dashboard");
+      } else {
+        toast.error(data.message || "❌ Login failed. Please try again.", {
+          id: "login-progress",
+        });
+        setErrorMessage(data.message || "Login failed. Please try again.");
+      }
+    } catch (error) {
+      toast.error(
+        "❌ Network error. Please check your connection and try again.",
+        { id: "login-progress" }
+      );
+      setErrorMessage(
+        "Network error. Please check your connection and try again."
+      );
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -67,13 +107,19 @@ export default function Login() {
           <div className="flex flex-col gap-2">
             <button
               type="submit"
-              className="w-full p-2 bg-black text-white rounded-lg"
+              disabled={isLoading}
+              className={`w-full p-2 rounded-lg text-white font-medium ${
+                isLoading
+                  ? "bg-gray-400 cursor-not-allowed"
+                  : "bg-black hover:bg-gray-800"
+              }`}
             >
-              Login
+              {isLoading ? "Logging in..." : "Login"}
             </button>
             <button
               type="button"
-              className="w-full p-2 border rounded-lg hover:bg-gray-100"
+              disabled={isLoading}
+              className="w-full p-2 border rounded-lg hover:bg-gray-100 disabled:opacity-50"
             >
               Continue with Google
             </button>
