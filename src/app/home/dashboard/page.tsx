@@ -1,5 +1,5 @@
 ﻿"use client";
-import PreviousMockContainer from "@/components/PreviousMockContainer";
+import PreviousMockContainer from "@/components/dashboard/PreviousMockContainer";
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 import { useAuth } from "@/context/AuthContext";
@@ -30,6 +30,10 @@ export default function Dashboard() {
     router.push("/interview/setup");
   };
 
+  const handleResumeCheck = () => {
+    router.push("/resume-check");
+  };
+
   return (
     <div className="">
       <div className="flex justify-between my-8 mx-5">
@@ -42,12 +46,14 @@ export default function Dashboard() {
           </h1>
         </div>
         <div className="mr-5 my-3">
-          <button className="bg-slate-200 rounded-md p-2">View analytics</button>
+          <button className="bg-slate-200 rounded-md p-2">
+            View analytics
+          </button>
         </div>
       </div>
 
       <div>
-        <button 
+        <button
           onClick={handleStartInterview}
           className="rounded-md w-50 h-15 bg-white border border-gray-100 shadow-sm mx-2 px-2 cursor-pointer hover:bg-gray-50 transition-colors"
         >
@@ -70,7 +76,10 @@ export default function Dashboard() {
           </div>
         </button>
 
-        <button className="rounded-md w-50 h-15 bg-white border border-gray-100 shadow-sm mx-2">
+        <button
+          onClick={handleResumeCheck}
+          className="rounded-md w-50 h-15 bg-white border border-gray-100 shadow-sm mx-2 px-2 cursor-pointer hover:bg-gray-50 transition-colors"
+        >
           <div className="flex">
             <svg
               xmlns="http://www.w3.org/2000/svg"
