@@ -1,6 +1,7 @@
 "use client";
 import { useRouter } from "next/navigation";
 import React, { useState } from "react";
+import toast from "react-hot-toast";
 
 export default function SignUp() {
   const [name, setName] = useState("");
@@ -14,10 +15,9 @@ export default function SignUp() {
     e.preventDefault();
     setIsLoading(true);
     setErrorMessage("");
+    toast.loading("📝 Creating your account...", { id: "signup-progress" });
 
     try {
-      console.log("Attempting signup with:", { name, email });
-
       const response = await fetch("/api/auth/signup", {
         method: "POST",
         headers: {
@@ -27,24 +27,30 @@ export default function SignUp() {
       });
 
       const data = await response.json();
-      console.log("Signup response:", data);
 
       if (data.success) {
         // Store the token in localStorage
         localStorage.setItem("authToken", data.data.token);
         localStorage.setItem("user", JSON.stringify(data.data.user));
 
-        console.log("Signup successful, redirecting...");
+        toast.success("✅ Account created successfully! Welcome!", {
+          id: "signup-progress",
+        });
         router.push("/home/dashboard");
       } else {
-        if (data.errors && data.errors.length > 0) {
-          setErrorMessage(data.errors.map((err: any) => err.msg).join(", "));
-        } else {
-          setErrorMessage(data.message || "Signup failed. Please try again.");
-        }
+        const errorMsg =
+          data.errors && data.errors.length > 0
+            ? data.errors.map((err: any) => err.msg).join(", ")
+            : data.message || "Signup failed. Please try again.";
+
+        toast.error(`❌ ${errorMsg}`, { id: "signup-progress" });
+        setErrorMessage(errorMsg);
       }
     } catch (error) {
-      console.error("Signup error:", error);
+      toast.error(
+        "❌ Network error. Please check your connection and try again.",
+        { id: "signup-progress" }
+      );
       setErrorMessage(
         "Network error. Please check your connection and try again."
       );
