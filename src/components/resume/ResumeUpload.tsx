@@ -296,6 +296,7 @@ const ResumeUpload: React.FC<ResumeUploadProps> = ({
                     accept=".pdf"
                     onChange={handleFileInputChange}
                     className="sr-only"
+                    suppressHydrationWarning
                   />
                 </label>
               </p>

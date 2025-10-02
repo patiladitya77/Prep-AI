@@ -2,7 +2,17 @@
 import { Lightbulb, Volume2, HelpCircle } from "lucide-react";
 import React from "react";
 
-const QuestionsSection = ({ mockInterviewQuestion, activeQuestionIndex }) => {
+interface Props {
+  mockInterviewQuestion: any[];
+  activeQuestionIndex: number;
+  setActiveQuestionIndex: (index: number) => void;
+}
+
+const QuestionsSection = ({
+  mockInterviewQuestion,
+  activeQuestionIndex,
+  setActiveQuestionIndex,
+}: Props) => {
   const textToSpeech = (text: string) => {
     if ("speechSynthesis" in window) {
       const speech = new SpeechSynthesisUtterance(text);
@@ -59,7 +69,7 @@ const QuestionsSection = ({ mockInterviewQuestion, activeQuestionIndex }) => {
           </div>
           <p className="text-yellow-700 text-sm">
             {process.env.NEXT_PUBLIC_QUESTION_NOTE ||
-              "Click on Record Answer when you want to answer the question. At the end of the interview we will give you the feedback along woth correct answer for each of the question and your answer to compare it"}
+              "Click on Record Answer when you want to answer the question. At the end of the interview we will give you the feedback along with correct answer for each of the question and your answer to compare it"}
           </p>
         </div>
       </div>
