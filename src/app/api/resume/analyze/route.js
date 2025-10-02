@@ -215,7 +215,6 @@ Please ensure all scores are realistic and constructive. Provide specific, actio
       // Extract text from PDF using Gemini AI
       let resumeText;
       try {
-        console.log("🔄 Extracting text from PDF using Gemini AI...");
         resumeText = await extractTextFromPDFWithAI(Buffer.from(buffer));
       } catch (pdfError) {
         console.error("PDF AI extraction error:", pdfError);

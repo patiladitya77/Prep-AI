@@ -37,7 +37,6 @@ async function extractTextFromPDFWithAI(buffer) {
     );
     return extractedText;
   } catch (error) {
-    console.error("PDF AI extraction error:", error);
     // Fallback to basic text
     return "PDF content extraction failed - proceeding with filename analysis";
   }
@@ -101,7 +100,6 @@ async function parseResumeWithAI(resumeText) {
     const cleanedText = text.replace(/```json\n?|\n?```/g, "").trim();
     return JSON.parse(cleanedText);
   } catch (error) {
-    console.error("Error parsing resume with AI:", error);
     // Return basic structure if AI parsing fails
     return {
       name: "",
@@ -147,7 +145,6 @@ async function POST(request) {
     });
 
     if (!user) {
-      console.log("👤 Creating new user record...");
       // Create a temporary user record
       try {
         user = await prisma.user.create({
@@ -158,9 +155,7 @@ async function POST(request) {
             name: decoded.name || "User",
           },
         });
-        console.log("👤 User created successfully");
       } catch (createError) {
-        console.error("Failed to create user:", createError);
         return NextResponse.json(
           { error: "User account issue - please login again" },
           { status: 401 }
@@ -264,7 +259,6 @@ async function POST(request) {
         },
       });
     } catch (dbError) {
-      console.error("Database error:", dbError);
       return NextResponse.json(
         { error: "Failed to save resume to database" },
         { status: 500 }
