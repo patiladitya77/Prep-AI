@@ -165,6 +165,7 @@ export default function ResumeCheckPage() {
                     onChange={handleChange}
                     className="hidden"
                     id="resume-upload"
+                    suppressHydrationWarning
                   />
                   <label htmlFor="resume-upload" className="cursor-pointer">
                     <div className="flex flex-col items-center">

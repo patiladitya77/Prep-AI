@@ -1,7 +1,8 @@
 "use client";
 import { useRouter } from "next/navigation";
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import toast from "react-hot-toast";
+import { useAuth } from "@/context/AuthContext";
 
 export default function Login() {
   const [email, setEmail] = useState("");
@@ -9,6 +10,14 @@ export default function Login() {
   const [errorMessage, setErrorMessage] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const router = useRouter();
+  const { login, isAuthenticated, isLoading: authLoading } = useAuth();
+
+  // Redirect if already authenticated
+  useEffect(() => {
+    if (!authLoading && isAuthenticated) {
+      router.push("/home/dashboard");
+    }
+  }, [isAuthenticated, authLoading, router]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -28,9 +37,8 @@ export default function Login() {
       const data = await response.json();
 
       if (data.success) {
-        // Store the token in localStorage
-        localStorage.setItem("authToken", data.data.token);
-        localStorage.setItem("user", JSON.stringify(data.data.user));
+        // Update AuthContext with login data
+        login(data.data.token, data.data.user);
 
         toast.success("✅ Login successful! Welcome back!", {
           id: "login-progress",
@@ -55,6 +63,20 @@ export default function Login() {
     }
   };
 
+  // Show loading while checking auth status
+  if (authLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen bg-white bg-opacity-20">
+        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-black"></div>
+      </div>
+    );
+  }
+
+  // Don't render login form if already authenticated
+  if (isAuthenticated) {
+    return null;
+  }
+
   return (
     <div className="flex items-center justify-center min-h-screen bg-white bg-opacity-20">
       <div className="w-full max-w-sm bg-white rounded-xl shadow-lg p-6">
@@ -78,6 +100,7 @@ export default function Login() {
               required
               value={email}
               onChange={(e) => setEmail(e.target.value)}
+              suppressHydrationWarning
             />
           </div>
 
@@ -97,6 +120,7 @@ export default function Login() {
               required
               value={password}
               onChange={(e) => setPassword(e.target.value)}
+              suppressHydrationWarning
             />
           </div>
 
@@ -113,6 +137,7 @@ export default function Login() {
                   ? "bg-gray-400 cursor-not-allowed"
                   : "bg-black hover:bg-gray-800"
               }`}
+              suppressHydrationWarning
             >
               {isLoading ? "Logging in..." : "Login"}
             </button>
@@ -120,12 +145,13 @@ export default function Login() {
               type="button"
               disabled={isLoading}
               className="w-full p-2 border rounded-lg hover:bg-gray-100 disabled:opacity-50"
+              suppressHydrationWarning
             >
               Continue with Google
             </button>
           </div>
 
-          <p className="text-center text-sm mt-2">
+          <p className="text-center text-sm mt-4">
             New here?{" "}
             <a href="/signup" className="text-blue-600 hover:underline">
               Sign Up
