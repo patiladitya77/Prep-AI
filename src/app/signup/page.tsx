@@ -81,6 +81,7 @@ export default function SignUp() {
               placeholder="John Doe"
               value={name}
               onChange={(e) => setName(e.target.value)}
+              suppressHydrationWarning
             />
           </div>
 
@@ -96,6 +97,7 @@ export default function SignUp() {
               required
               value={email}
               onChange={(e) => setEmail(e.target.value)}
+              suppressHydrationWarning
             />
           </div>
 
@@ -110,6 +112,7 @@ export default function SignUp() {
               required
               value={password}
               onChange={(e) => setPassword(e.target.value)}
+              suppressHydrationWarning
             />
           </div>
 
@@ -126,6 +129,7 @@ export default function SignUp() {
                   ? "bg-gray-400 cursor-not-allowed"
                   : "bg-black hover:bg-gray-800"
               }`}
+              suppressHydrationWarning
             >
               {isLoading ? "Creating Account..." : "Sign Up"}
             </button>
@@ -133,6 +137,7 @@ export default function SignUp() {
               type="button"
               disabled={isLoading}
               className="w-full p-2 border rounded-lg hover:bg-gray-100 disabled:opacity-50"
+              suppressHydrationWarning
             >
               Continue with Google
             </button>
