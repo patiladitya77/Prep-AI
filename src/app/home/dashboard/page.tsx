@@ -34,6 +34,10 @@ export default function Dashboard() {
     router.push("/resume-check");
   };
 
+  const handleViewAnalytics = () => {
+    router.push("/home/analytics");
+  };
+
   return (
     <div className="">
       <div className="flex justify-between my-8 mx-5">
@@ -46,7 +50,10 @@ export default function Dashboard() {
           </h1>
         </div>
         <div className="mr-5 my-3">
-          <button className="bg-slate-200 rounded-md p-2">
+          <button
+            onClick={handleViewAnalytics}
+            className="bg-slate-200 rounded-md p-2 hover:bg-slate-300 transition-colors cursor-pointer"
+          >
             View analytics
           </button>
         </div>

@@ -14,10 +14,13 @@ model User {
   passwordHash      String             @map("password_hash")
   subscriptionPlan  String?            @map("subscription_plan")
   interviewAttempts Int                @default(0) @map("interview_attempts")
+  resetToken        String?            @map("reset_token")
+  resetTokenExpiry  DateTime?          @map("reset_token_expiry")
   createdAt         DateTime           @default(now()) @map("created_at")
   updatedAt         DateTime           @updatedAt @map("updated_at")
   interviewSessions InterviewSession[]
   jobDescriptions   JD[]
+  resumeAnalyses    ResumeAnalysis[]
   resumes           Resume[]
 
   @@map("users")
@@ -35,6 +38,26 @@ model Resume {
   user              User               @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("resumes")
+}
+
+model ResumeAnalysis {
+  id             String   @id @default(cuid())
+  userId         String   @map("user_id")
+  fileName       String   @map("file_name")
+  analysisType   String   @map("analysis_type")
+  overallScore   Float    @map("overall_score")
+  detailedScores Json?    @map("detailed_scores")
+  strengths      Json?
+  weaknesses     Json?
+  suggestions    Json?
+  extractedText  String?  @map("extracted_text")
+  jobDescription String?  @map("job_description")
+  analysisDate   DateTime @default(now()) @map("analysis_date")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("resume_analyses")
 }
 
 model JD {
@@ -85,6 +108,10 @@ model Answer {
   sessionId       String           @map("session_id")
   questionId      String           @map("question_id")
   candidateAnswer String           @map("candidate_answer")
+  score           Float?           @default(0)
+  feedback        String?
+  strengths       Json?
+  improvements    Json?
   submittedAt     DateTime         @default(now()) @map("submitted_at")
   question        Question         @relation(fields: [questionId], references: [id], onDelete: Cascade)
   session         InterviewSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
