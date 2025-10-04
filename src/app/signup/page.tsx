@@ -2,6 +2,7 @@
 import { useRouter } from "next/navigation";
 import React, { useState } from "react";
 import toast from "react-hot-toast";
+import { ButtonLoading } from "@/components/ui/Loading";
 
 export default function SignUp() {
   const [name, setName] = useState("");
@@ -131,7 +132,14 @@ export default function SignUp() {
               }`}
               suppressHydrationWarning
             >
-              {isLoading ? "Creating Account..." : "Sign Up"}
+              {isLoading ? (
+                <div className="flex items-center justify-center space-x-2">
+                  <ButtonLoading />
+                  <span>Creating account...</span>
+                </div>
+              ) : (
+                "Create account"
+              )}
             </button>
             <button
               type="button"

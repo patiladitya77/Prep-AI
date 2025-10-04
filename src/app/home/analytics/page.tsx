@@ -5,6 +5,11 @@ import { useAuth } from "@/context/AuthContext";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
+import {
+  PageLoading,
+  CardLoading,
+  InlineLoading,
+} from "@/components/ui/Loading";
 
 interface AnalyticsData {
   totalInterviews: number;
@@ -95,11 +100,7 @@ export default function Analytics() {
   };
 
   if (isLoading || loading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-600"></div>
-      </div>
-    );
+    return <PageLoading text="Loading analytics..." />;
   }
 
   if (!isAuthenticated) {

@@ -3,6 +3,7 @@ import { useRouter } from "next/navigation";
 import React, { useState, useEffect } from "react";
 import toast from "react-hot-toast";
 import { useAuth } from "@/context/AuthContext";
+import { PageLoading, ButtonLoading } from "@/components/ui/Loading";
 
 export default function Login() {
   const [email, setEmail] = useState("");
@@ -65,11 +66,7 @@ export default function Login() {
 
   // Show loading while checking auth status
   if (authLoading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen bg-white bg-opacity-20">
-        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-black"></div>
-      </div>
-    );
+    return <PageLoading text="Checking authentication..." />;
   }
 
   // Don't render login form if already authenticated
@@ -139,7 +136,14 @@ export default function Login() {
               }`}
               suppressHydrationWarning
             >
-              {isLoading ? "Logging in..." : "Login"}
+              {isLoading ? (
+                <div className="flex items-center justify-center space-x-2">
+                  <ButtonLoading />
+                  <span>Logging in...</span>
+                </div>
+              ) : (
+                "Login"
+              )}
             </button>
             <button
               type="button"

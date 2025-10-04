@@ -5,6 +5,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 import { useState, useEffect } from "react";
+import Loading, { PageLoading, InlineLoading } from "@/components/ui/Loading";
 
 interface AnalyticsData {
   totalInterviews: number;
@@ -88,7 +89,7 @@ export default function Home() {
       <div className="min-h-screen bg-gray-50">
         <NavBar />
         <div className="flex items-center justify-center h-[80vh]">
-          <div className="text-gray-600 text-xl">Loading...</div>
+          <InlineLoading text="Loading..." />
         </div>
       </div>
     );
@@ -180,8 +181,16 @@ export default function Home() {
                   {isLoading ? (
                     // Show loading state to prevent hydration mismatch
                     <div className="flex flex-col sm:flex-row gap-4 justify-center">
-                      <div className="bg-gray-200 animate-pulse h-12 w-32 rounded-md"></div>
-                      <div className="bg-gray-200 animate-pulse h-12 w-32 rounded-md"></div>
+                      <Loading
+                        variant="pulse"
+                        size="large"
+                        className="h-12 w-32 rounded-md"
+                      />
+                      <Loading
+                        variant="pulse"
+                        size="large"
+                        className="h-12 w-32 rounded-md"
+                      />
                     </div>
                   ) : isAuthenticated ? (
                     // Show dashboard button when logged in
@@ -315,7 +324,7 @@ export default function Home() {
                       <div className="p-8">
                         {analyticsLoading ? (
                           <div className="flex items-center justify-center py-12">
-                            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                            <Loading size="medium" color="blue" />
                             <span className="ml-3 text-gray-600">
                               Loading analytics...
                             </span>
