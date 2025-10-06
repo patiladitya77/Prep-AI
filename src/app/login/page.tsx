@@ -41,12 +41,12 @@ export default function Login() {
         // Update AuthContext with login data
         login(data.data.token, data.data.user);
 
-        toast.success("✅ Login successful! Welcome back!", {
+        toast.success(" Login successful! Welcome back!", {
           id: "login-progress",
         });
         router.push("/home/dashboard");
       } else {
-        toast.error(data.message || "❌ Login failed. Please try again.", {
+        toast.error(data.message || " Login failed. Please try again.", {
           id: "login-progress",
         });
         setErrorMessage(data.message || "Login failed. Please try again.");
@@ -148,7 +148,11 @@ export default function Login() {
             <button
               type="button"
               disabled={isLoading}
-              className="w-full p-2 border rounded-lg hover:bg-gray-100 disabled:opacity-50"
+              onClick={() => {
+                // Redirect to server endpoint that starts Google OAuth
+                window.location.href = "/api/auth/google";
+              }}
+              className="w-full p-2 border rounded-lg hover:bg-gray-100 disabled:opacity-50 cursor-pointer"
               suppressHydrationWarning
             >
               Continue with Google
