@@ -646,7 +646,7 @@ export const useInterviewMonitoring = ({
         e.ctrlKey && e.code === "Tab",
         e.ctrlKey && e.shiftKey && e.code === "Tab",
         e.altKey && e.code === "F4", // Close Window
-        
+
         // DevTools access (all possible combinations)
         e.code === "F12",
         e.ctrlKey && e.shiftKey && e.code === "KeyI", // DevTools
@@ -654,26 +654,26 @@ export const useInterviewMonitoring = ({
         e.ctrlKey && e.shiftKey && e.code === "KeyC", // DevTools Inspect
         e.ctrlKey && e.shiftKey && e.code === "KeyK", // DevTools (alternative)
         e.ctrlKey && e.code === "KeyU", // View Source
-        
+
         // Window management and minimize
         e.metaKey && e.code === "KeyM", // Minimize (Mac)
         e.altKey && e.code === "Space", // Window menu (Windows)
         e.metaKey && e.code === "KeyH", // Hide window (Mac)
         e.metaKey && e.code === "KeyD", // Show desktop (Mac)
         e.metaKey && e.code === "F3", // Mission Control (Mac)
-        
+
         // Split screen shortcuts
         e.metaKey && e.code === "ArrowLeft", // Snap left (Mac)
         e.metaKey && e.code === "ArrowRight", // Snap right (Mac)
         e.metaKey && e.code === "ArrowUp", // Fullscreen (Mac)
         e.metaKey && e.code === "ArrowDown", // Minimize (Mac)
-        
+
         // Windows snap shortcuts
         e.metaKey && e.shiftKey && e.code === "ArrowLeft", // Move to left monitor
         e.metaKey && e.shiftKey && e.code === "ArrowRight", // Move to right monitor
         e.metaKey && e.shiftKey && e.code === "ArrowUp", // Maximize vertically
         e.metaKey && e.shiftKey && e.code === "ArrowDown", // Restore/minimize
-        
+
         // Additional browser and system shortcuts
         e.ctrlKey && e.code === "KeyS", // Save Page
         e.ctrlKey && e.code === "KeyP", // Print
@@ -687,12 +687,12 @@ export const useInterviewMonitoring = ({
         e.ctrlKey && e.code === "KeyT", // New tab
         e.ctrlKey && e.shiftKey && e.code === "KeyT", // Reopen closed tab
         e.ctrlKey && e.code === "KeyW", // Close tab
-        
+
         // Function keys that might cause issues
         e.code === "F1", // Help
         e.code === "F11", // Fullscreen toggle
         e.altKey && e.code === "Enter", // Properties
-        
+
         // Console access attempts
         e.ctrlKey && e.code === "Semicolon", // Console shortcut in some IDEs
         e.ctrlKey && e.code === "Backquote", // Console toggle in some applications
@@ -719,20 +719,27 @@ export const useInterviewMonitoring = ({
     };
 
     // Window resize monitoring to detect split screen attempts
-    let initialWindowSize = { width: window.innerWidth, height: window.innerHeight };
+    let initialWindowSize = {
+      width: window.innerWidth,
+      height: window.innerHeight,
+    };
     const handleResize = () => {
       const currentWidth = window.innerWidth;
       const currentHeight = window.innerHeight;
-      
+
       // Check for significant size reduction that might indicate split screen or minimize
-      const widthReduction = (initialWindowSize.width - currentWidth) / initialWindowSize.width;
-      const heightReduction = (initialWindowSize.height - currentHeight) / initialWindowSize.height;
-      
+      const widthReduction =
+        (initialWindowSize.width - currentWidth) / initialWindowSize.width;
+      const heightReduction =
+        (initialWindowSize.height - currentHeight) / initialWindowSize.height;
+
       // If window size is reduced by more than 25%, it's likely split screen or minimized
       if (widthReduction > 0.25 || heightReduction > 0.25) {
         addWarning("tab-switch");
-        toast.error("⚠️ Window resizing/split screen is not allowed during interview!");
-        
+        toast.error(
+          "⚠️ Window resizing/split screen is not allowed during interview!"
+        );
+
         // Try to restore fullscreen
         if (document.documentElement.requestFullscreen) {
           document.documentElement.requestFullscreen().catch(() => {
@@ -749,7 +756,7 @@ export const useInterviewMonitoring = ({
         // User exited fullscreen
         addWarning("tab-switch");
         toast.error("⚠️ Exiting fullscreen is not allowed during interview!");
-        
+
         // Try to re-enter fullscreen
         if (document.documentElement.requestFullscreen) {
           document.documentElement.requestFullscreen().catch(() => {
@@ -769,7 +776,10 @@ export const useInterviewMonitoring = ({
 
     // Request fullscreen on start (optional - can be enabled if desired)
     const requestFullscreen = () => {
-      if (document.documentElement.requestFullscreen && !document.fullscreenElement) {
+      if (
+        document.documentElement.requestFullscreen &&
+        !document.fullscreenElement
+      ) {
         document.documentElement.requestFullscreen().catch(() => {
           console.warn("Could not enter fullscreen mode");
         });
