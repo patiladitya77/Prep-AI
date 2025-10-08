@@ -27,28 +27,24 @@ export default function RootLayout({
       >
         <AuthProvider>{children}</AuthProvider>
         <Toaster
-          position="top-right"
+            position="top-right"
           toastOptions={{
-            duration: 4000,
+            duration: 6000,
             style: {
               background: "#363636",
               color: "#fff",
+              // Force single-line display with ellipsis for long messages
+              whiteSpace: "nowrap",
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+              maxWidth: "600px",
             },
             success: {
               duration: 3000,
-              iconTheme: {
-                primary: "#10b981",
-                secondary: "#fff",
-              },
-            },
-            error: {
-              duration: 5000,
-              iconTheme: {
-                primary: "#ef4444",
-                secondary: "#fff",
-              },
+
             },
             loading: {
+              duration: 8000,
               iconTheme: {
                 primary: "#3b82f6",
                 secondary: "#fff",

@@ -50,7 +50,7 @@ export default function ResetPassword() {
         resetToken.length === 64 &&
         process.env.NODE_ENV === "development"
       ) {
-        console.log("Database validation failed, using development fallback");
+        // Database validation failed in development, falling back to token format check
         setIsValidToken(true);
       }
     } catch (error) {

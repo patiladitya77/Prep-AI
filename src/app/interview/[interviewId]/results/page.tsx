@@ -1,5 +1,5 @@
 "use client";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 import toast from "react-hot-toast";
@@ -43,6 +43,8 @@ export default function InterviewResultsPage() {
   const [results, setResults] = useState<InterviewResults | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  const reattemptingRef = useRef(false);
 
   const interviewId = params.interviewId as string;
 
@@ -92,6 +94,8 @@ export default function InterviewResultsPage() {
 
   const handleReAttempt = async () => {
     try {
+      if (reattemptingRef.current) return;
+      reattemptingRef.current = true;
       const token = localStorage.getItem("authToken");
       if (!token) {
         toast.error("❌ Please login to re-attempt interview");
@@ -121,13 +125,22 @@ export default function InterviewResultsPage() {
       if (data.success) {
         toast.success("🎯 New interview session created! Redirecting...");
         // Redirect to the new interview session with active parameter
+        console.debug(
+          "ResultsPage: navigating to interview reattempt",
+          data.sessionId
+        );
         router.push(`/interview/${data.sessionId}?session=active`);
+        setTimeout(() => {
+          reattemptingRef.current = false;
+        }, 3000);
       } else {
         toast.error(`❌ ${data.error || "Failed to re-attempt interview"}`);
+        reattemptingRef.current = false;
       }
     } catch (error) {
       console.error("Error re-attempting interview:", error);
       toast.error("❌ Network error. Please try again.");
+      reattemptingRef.current = false;
     }
   };
 
