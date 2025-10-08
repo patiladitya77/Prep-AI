@@ -9,6 +9,7 @@ import ResumeDisplay from "../resume/ResumeDisplay";
 import toast from "react-hot-toast";
 import { ButtonLoading } from "../ui/Loading";
 import Loading from "../ui/Loading";
+import { invalidateInterviewCache } from "@/utils/interviewCache";
 
 interface InterviewSetupProps {
   interviewId?: string;
@@ -158,6 +159,9 @@ const InterviewSetup: React.FC<InterviewSetupProps> = ({ interviewId }) => {
 
       const data = await response.json();
       if (data.success) {
+        // Invalidate interview cache since a new interview was created
+        invalidateInterviewCache();
+
         // Navigate to the interview with the session ID
         // Only navigate once
         if (!navigatedRef.current) {

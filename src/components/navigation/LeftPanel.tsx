@@ -13,11 +13,13 @@ import {
   User,
 } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
+import { useUsageStats } from "../../hooks/useUsageStats";
 
 export default function LeftPanel() {
   const pathName = usePathname() || "/";
   const router = useRouter();
   const { user, logout } = useAuth();
+  const { usage, loading: usageLoading } = useUsageStats();
 
   type NavItemProps = {
     icon: React.ComponentType<React.SVGProps<SVGSVGElement>>;
@@ -159,7 +161,11 @@ export default function LeftPanel() {
             </span>
           </div>
           <div className="space-y-1">
-            <LibraryItem icon={Upload} label="Upload Resume" />
+            <NavItem
+              icon={Upload}
+              label="Upload Resume"
+              href="/home/upload-resume"
+            />
             {/* <LibraryItem icon={Bookmark} label="Bookmarks" />
             <LibraryItem icon={MessageSquare} label="Feedback History" /> */}
           </div>
@@ -184,12 +190,18 @@ export default function LeftPanel() {
               <span className="text-xs font-medium text-gray-700">
                 AI Interviews
               </span>
-              <span className="text-xs font-bold text-black">1/4</span>
+              <span className="text-xs font-bold text-black">
+                {usageLoading
+                  ? "..."
+                  : `${usage?.interviews.used || 0}/${
+                      usage?.interviews.limit || 4
+                    }`}
+              </span>
             </div>
             <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
               <div
                 className="h-full bg-black rounded-full transition-all duration-500"
-                style={{ width: "25%" }}
+                style={{ width: `${usage?.interviews.percentage || 0}%` }}
               />
             </div>
           </div>
@@ -200,32 +212,19 @@ export default function LeftPanel() {
               <span className="text-xs font-medium text-gray-700">
                 Resume Checks
               </span>
-              <span className="text-xs font-bold text-black">4/6</span>
+              <span className="text-xs font-bold text-black">
+                {usageLoading
+                  ? "..."
+                  : `${usage?.resumes.used || 0}/${usage?.resumes.limit || 6}`}
+              </span>
             </div>
             <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
               <div
                 className="h-full bg-gray-700 rounded-full transition-all duration-500"
-                style={{ width: "66.67%" }}
+                style={{ width: `${usage?.resumes.percentage || 0}%` }}
               />
             </div>
           </div>
-
-          <p className="text-xs text-gray-500 mb-3 flex items-center gap-1">
-            <svg
-              className="w-3 h-3"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
-              />
-            </svg>
-            Resets on Sep 1, 2025
-          </p>
 
           <button className="w-full bg-black hover:bg-gray-900 text-white rounded-xl py-2.5 text-sm font-semibold shadow-lg hover:shadow-xl transition-all duration-200 flex items-center justify-center gap-2 group">
             <Sparkles className="w-4 h-4 group-hover:rotate-12 transition-transform duration-200" />

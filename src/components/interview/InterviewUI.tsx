@@ -10,7 +10,9 @@ import Avatar from "./Avatar";
 import toast from "react-hot-toast";
 import { useRouter } from "next/navigation";
 import { useInterviewMonitoring } from "@/hooks/useInterviewMonitoring";
+import { useAuth } from "@/context/AuthContext";
 import Loading from "../ui/Loading";
+import { invalidateInterviewCache } from "@/utils/interviewCache";
 
 // Dynamic imports to prevent window undefined errors
 const RecordAnswerSection = dynamic(() => import("./RecordAnswerSection"), {
@@ -57,6 +59,9 @@ const InterviewUI: React.FC<InterviewUIProps> = ({ sessionId }) => {
   const [avatarImageUrl, setAvatarImageUrl] = useState<string | null>(null);
   const router = useRouter();
   const pathname = usePathname();
+
+  // Get user info for greeting
+  const { user } = useAuth();
   const lastWarningRef = useRef<{
     type: string;
     count: number;
@@ -571,6 +576,9 @@ const InterviewUI: React.FC<InterviewUIProps> = ({ sessionId }) => {
         }
         setShowResults(true);
 
+        // Invalidate interview cache since a new interview was completed
+        invalidateInterviewCache();
+
         toast.success(
           `🎯 Interview completed! Final score: ${data.data.overallScore}/10 (${data.data.grade})`,
           { id: `final-score-success-${sessionId}`, duration: 5000 }
@@ -827,6 +835,7 @@ const InterviewUI: React.FC<InterviewUIProps> = ({ sessionId }) => {
               autoSpeak={avatarEnabled}
               variant={avatarVariant}
               imageUrl={avatarImageUrl}
+              userName={user?.name || null}
               onVariantChange={(
                 v: "professional_female" | "professional_male"
               ) => {

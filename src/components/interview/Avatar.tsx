@@ -9,6 +9,8 @@ interface AvatarProps {
   onVariantChange?: (v: AvatarVariant) => void;
   imageUrl?: string | null;
   isFirstQuestion?: boolean;
+  userName?: string | null;
+  onGreetingComplete?: () => void;
 }
 
 const getAvatarImage = (variant: AvatarVariant): string => {
@@ -29,12 +31,89 @@ const Avatar: React.FC<AvatarProps> = ({
   onVariantChange,
   imageUrl = null,
   isFirstQuestion = false,
+  userName = null,
+  onGreetingComplete,
 }) => {
   const [isSpeaking, setIsSpeaking] = useState(false);
+  const [hasGreeted, setHasGreeted] = useState(false);
   const utterRef = useRef<SpeechSynthesisUtterance | null>(null);
 
+  // Greeting effect - runs once when component mounts
   useEffect(() => {
-    if (!autoSpeak || !text) return;
+    if (hasGreeted || !userName || !autoSpeak) return;
+    if (typeof window === "undefined" || !("speechSynthesis" in window)) {
+      setHasGreeted(true);
+      onGreetingComplete?.();
+      return;
+    }
+
+    // Only play greeting audio for female avatars, skip for male
+    if (variant !== "professional_female") {
+      // For male avatars, just mark as greeted without audio
+      const timer = setTimeout(() => {
+        setHasGreeted(true);
+        onGreetingComplete?.();
+      }, 1000);
+      
+      return () => {
+        if (timer) clearTimeout(timer);
+      };
+    }
+
+    const hour = new Date().getHours();
+    
+    let greeting = "Hello";
+    if (hour < 12) greeting = "Good morning";
+    else if (hour < 18) greeting = "Good afternoon";
+    else greeting = "Good evening";
+
+    const greetingText = `${greeting}, ${userName}. Welcome to your professional interview session. I will be your interviewer today. Let's begin.`;
+
+    const timer = setTimeout(() => {
+      const u = new SpeechSynthesisUtterance(greetingText);
+      u.rate = 0.9;
+
+      const voices = window.speechSynthesis.getVoices();
+      // Only handle female voice since we're only playing audio for female avatars
+      const femaleVoice =
+        voices.find(
+          (voice) =>
+            voice.name.toLowerCase().includes("female") ||
+            voice.name.toLowerCase().includes("woman") ||
+            voice.name.toLowerCase().includes("zira") ||
+            voice.name.toLowerCase().includes("susan")
+        ) ||
+        voices.find(
+          (voice) =>
+            voice.lang.startsWith("en") &&
+            !voice.name.toLowerCase().includes("male")
+        );
+      if (femaleVoice) u.voice = femaleVoice;
+      u.pitch = 1.3;
+
+      u.onstart = () => setIsSpeaking(true);
+      u.onend = () => {
+        setIsSpeaking(false);
+        setHasGreeted(true);
+        onGreetingComplete?.();
+      };
+      u.onerror = () => {
+        setIsSpeaking(false);
+        setHasGreeted(true);
+        onGreetingComplete?.();
+      };
+
+      utterRef.current = u;
+      window.speechSynthesis.speak(u);
+    }, 1000);
+
+    return () => {
+      if (timer) clearTimeout(timer);
+    };
+  }, [userName, variant, autoSpeak, hasGreeted, onGreetingComplete]);
+
+  useEffect(() => {
+    if (!autoSpeak || !text || !hasGreeted) return;
     if (typeof window === "undefined" || !("speechSynthesis" in window)) {
       return;
     }
@@ -49,7 +128,7 @@ const Avatar: React.FC<AvatarProps> = ({
     }
 
     // Add 5-second delay for the first question, 1 second for others
-    const delay = isFirstQuestion ? 5000 : 1000;
+    const delay = isFirstQuestion ? 3000 : 1000;
 
     const timer = setTimeout(() => {
       const u = new SpeechSynthesisUtterance(text);
@@ -124,7 +203,7 @@ const Avatar: React.FC<AvatarProps> = ({
         setIsSpeaking(false);
       }
     };
-  }, [text, autoSpeak, isFirstQuestion, variant]);
+  }, [text, autoSpeak, isFirstQuestion, variant, hasGreeted]);
 
   const replay = () => {
     if (typeof window === "undefined" || !("speechSynthesis" in window)) {
@@ -312,8 +391,20 @@ const Avatar: React.FC<AvatarProps> = ({
                   : "bg-white border-blue-500 shadow-sm"
               }`}
             >
-              <div className="font-semibold mb-2 text-gray-700">Question:</div>
-              <div className="text-gray-800">{text}</div>
+              <div className="font-semibold mb-2 text-gray-700">
+                {!hasGreeted ? "Welcome" : "Question:"}
+              </div>
+              <div className="text-gray-800">
+                {!hasGreeted ? (
+                  <div className="text-center text-gray-600 italic">
+                    {isSpeaking
+                      ? "Greeting in progress..."
+                      : "Preparing to greet you..."}
+                  </div>
+                ) : (
+                  text
+                )}
+              </div>
             </div>
           </div>
         </div>
