@@ -5,6 +5,7 @@ import { useAuth } from "@/context/AuthContext";
 import toast from "react-hot-toast";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
+import { invalidateInterviewCache } from "@/utils/interviewCache";
 
 interface QuestionResult {
   questionId: string;
@@ -123,6 +124,9 @@ export default function InterviewResultsPage() {
       toast.dismiss(loadingToast);
 
       if (data.success) {
+        // Invalidate interview cache since a new interview session was created
+        invalidateInterviewCache();
+
         toast.success("🎯 New interview session created! Redirecting...");
         // Redirect to the new interview session with active parameter
         console.debug(
