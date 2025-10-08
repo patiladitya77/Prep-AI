@@ -1,8 +1,9 @@
 "use client";
-import React, { use, useEffect, useState } from "react";
+import React, { use, useEffect, useState, useRef } from "react";
 import PreviousInterviewCard from "./PreviousInterviewCard";
 import toast from "react-hot-toast";
 import { useRouter } from "next/navigation";
+import Loading from "../ui/Loading";
 
 interface Interview {
   id: string;
@@ -21,6 +22,8 @@ const PreviousMockContainer = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const router = useRouter();
+  // prevent duplicate reattempt submissions per interview id
+  const reattemptingRef = useRef<Record<string, boolean>>({});
 
   useEffect(() => {
     fetchCompletedInterviews();
@@ -48,11 +51,11 @@ const PreviousMockContainer = () => {
         setInterviews(data.data.interviews);
       } else {
         setError(data.error || "Failed to fetch interview history");
-        toast.error("❌ Failed to load interview history");
+        toast.error(" Failed to load interview history");
       }
     } catch (error) {
       setError("Network error loading interviews");
-      toast.error("❌ Network error loading interview history");
+      toast.error(" Network error loading interview history");
     } finally {
       setLoading(false);
     }
@@ -60,15 +63,18 @@ const PreviousMockContainer = () => {
 
   const handleReAttempt = async (interviewId: string) => {
     try {
+      if (reattemptingRef.current[interviewId]) return;
+      reattemptingRef.current[interviewId] = true;
       const token = localStorage.getItem("authToken");
       if (!token) {
-        toast.error("❌ Please login to re-attempt interview");
+        toast.error(" Please login to re-attempt interview");
         return;
       }
 
-      // Show loading toast
-      const loadingToast = toast.loading(
-        "🔄 Creating new interview session..."
+      // Show loading toast while creating a new session
+      const loadingToastId = toast.loading(
+        "Creating new interview session...",
+        { id: `reattempt-loading-${interviewId}` }
       );
 
       const response = await fetch("/api/interview/reattempt", {
@@ -84,18 +90,35 @@ const PreviousMockContainer = () => {
 
       const data = await response.json();
 
-      toast.dismiss(loadingToast);
+      // Dismiss loading toast
+      toast.dismiss(loadingToastId);
 
       if (data.success) {
-        toast.success("🎯 New interview session created! Redirecting...");
+        toast.success("🎯 New interview session created! Redirecting...", {
+          id: `reattempt-success-${interviewId}`,
+        });
         // Redirect to the new interview session with active parameter
+        console.debug(
+          "PreviousMockContainer: navigating to interview reattempt",
+          data.sessionId
+        );
         router.push(`/interview/${data.sessionId}?session=active`);
+        // leave the flag true briefly; clear after a tick
+        setTimeout(() => {
+          delete reattemptingRef.current[interviewId];
+        }, 3000);
       } else {
-        toast.error(`❌ ${data.error || "Failed to re-attempt interview"}`);
+        toast.error(` ${data.error || "Failed to re-attempt interview"}`, {
+          id: `reattempt-error-${interviewId}`,
+        });
+        delete reattemptingRef.current[interviewId];
       }
     } catch (error) {
       console.error("Error re-attempting interview:", error);
-      toast.error("❌ Network error. Please try again.");
+      toast.error("Network error. Please try again.", {
+        id: `reattempt-error-${interviewId}`,
+      });
+      delete reattemptingRef.current[interviewId];
     }
   };
 
@@ -106,7 +129,7 @@ const PreviousMockContainer = () => {
           Previous Mock Interviews
         </h1>
         <div className="p-4 text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
+          <Loading size="medium" color="blue" />
           <p className="text-gray-500 mt-2">
             Loading your interview history...
           </p>
@@ -157,6 +180,10 @@ const PreviousMockContainer = () => {
               }}
               onViewFeedback={() => {
                 // Navigate to feedback page or open modal
+                console.debug(
+                  "PreviousMockContainer: navigating to results",
+                  interview.id
+                );
                 router.push(`/interview/${interview.id}/results`);
               }}
             />
