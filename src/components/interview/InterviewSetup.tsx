@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "../ui/button";
 import { Card } from "../ui/card";
@@ -7,6 +7,8 @@ import { Label } from "../ui/label";
 import ResumeUpload from "../resume/ResumeUpload";
 import ResumeDisplay from "../resume/ResumeDisplay";
 import toast from "react-hot-toast";
+import { ButtonLoading } from "../ui/Loading";
+import Loading from "../ui/Loading";
 
 interface InterviewSetupProps {
   interviewId?: string;
@@ -16,6 +18,7 @@ const InterviewSetup: React.FC<InterviewSetupProps> = ({ interviewId }) => {
   const router = useRouter();
   const [currentStep, setCurrentStep] = useState(1);
   const [loading, setLoading] = useState(false);
+  const [creatingInterview, setCreatingInterview] = useState(false);
   const [existingResumes, setExistingResumes] = useState<any[]>([]);
   const [selectedResume, setSelectedResume] = useState<any>(null);
 
@@ -25,6 +28,10 @@ const InterviewSetup: React.FC<InterviewSetupProps> = ({ interviewId }) => {
     jobDescription: "",
     experienceYears: "",
   });
+
+  // Guard refs to prevent double submission/navigation
+  const isSubmittingRef = useRef(false);
+  const navigatedRef = useRef(false);
 
   useEffect(() => {
     fetchExistingResumes();
@@ -71,7 +78,7 @@ const InterviewSetup: React.FC<InterviewSetupProps> = ({ interviewId }) => {
         }
       }
     } catch (error) {
-      toast.error("❌ Failed to load interview data");
+      toast.error("Failed to load interview data");
     }
   };
 
@@ -95,7 +102,7 @@ const InterviewSetup: React.FC<InterviewSetupProps> = ({ interviewId }) => {
         }
       }
     } catch (error) {
-      toast.error("❌ Failed to load existing resumes");
+      toast.error(" Failed to load existing resumes");
     }
   };
 
@@ -117,12 +124,17 @@ const InterviewSetup: React.FC<InterviewSetupProps> = ({ interviewId }) => {
   };
 
   const handleCreateInterview = async () => {
-    setLoading(true);
+    // Prevent double submission/navigation
+    if (isSubmittingRef.current) return;
+    isSubmittingRef.current = true;
+    setCreatingInterview(true);
 
     try {
       const token = localStorage.getItem("authToken");
       if (!token) {
         alert("Please log in to continue");
+        isSubmittingRef.current = false;
+        setCreatingInterview(false);
         return;
       }
 
@@ -147,14 +159,34 @@ const InterviewSetup: React.FC<InterviewSetupProps> = ({ interviewId }) => {
       const data = await response.json();
       if (data.success) {
         // Navigate to the interview with the session ID
-        router.push(`/interview/${data.data.sessionId}?session=active`);
+        // Only navigate once
+        if (!navigatedRef.current) {
+          navigatedRef.current = true;
+          console.debug(
+            "InterviewSetup: navigating to interview",
+            data.data.sessionId
+          );
+          // await navigation so we don't clear the creating state prematurely
+          // (keeps the full-screen loading visible until the router finishes)
+          await router.push(`/interview/${data.data.sessionId}?session=active`);
+          // navigation initiated; nothing more to do here
+          return;
+        }
       } else {
         throw new Error(data.error || "Failed to create interview");
       }
     } catch (error) {
-      toast.error("❌ Failed to create interview session. Please try again.");
+      toast.error(" Failed to create interview session. Please try again.");
     } finally {
-      setLoading(false);
+      // If we navigated away, keep creatingInterview true to avoid briefly
+      // rendering the review UI; clear only when we did not navigate.
+      try {
+        if (!navigatedRef.current) {
+          setCreatingInterview(false);
+        }
+      } finally {
+        isSubmittingRef.current = false;
+      }
     }
   };
 
@@ -166,6 +198,16 @@ const InterviewSetup: React.FC<InterviewSetupProps> = ({ interviewId }) => {
       selectedResume
     );
   };
+
+  // Show full screen loading during interview creation
+  if (creatingInterview) {
+    return (
+      <div className="p-100 text-center">
+        <Loading size="medium" color="blue" />
+        <p className="text-gray-500 mt-2">Creating your Interview Session...</p>
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-4xl mx-auto p-6">
@@ -364,16 +406,23 @@ const InterviewSetup: React.FC<InterviewSetupProps> = ({ interviewId }) => {
               <Button
                 variant="outline"
                 onClick={() => setCurrentStep(2)}
-                disabled={loading}
+                disabled={loading || creatingInterview}
               >
                 Back to Resume
               </Button>
               <Button
                 onClick={handleCreateInterview}
-                disabled={!isFormValid() || loading}
-                className="bg-blue-600 hover:bg-blue-700 px-8 py-2"
+                disabled={!isFormValid() || creatingInterview}
+                className="bg-black hover:bg-black px-8 py-2 text-white"
               >
-                {loading ? "Creating Interview..." : "Start Interview"}
+                {creatingInterview ? (
+                  <>
+                    <ButtonLoading size="small" />
+                    <span className="ml-2">Creating Interview...</span>
+                  </>
+                ) : (
+                  "Start Interview"
+                )}
               </Button>
             </div>
           </Card>
