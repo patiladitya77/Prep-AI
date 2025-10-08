@@ -26,8 +26,34 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    // Only access localStorage on client side
-    if (typeof window !== "undefined") {
+    // Run initialization async so we can await profile fetch before marking loading done
+    const init = async () => {
+      // Only access localStorage on client side
+      if (typeof window === "undefined") {
+        setIsLoading(false);
+        return;
+      }
+
+      // If redirected from OAuth flow with token in hash (#token=...), extract and store it
+      try {
+        const hash = window.location.hash;
+        if (hash && hash.startsWith("#token=")) {
+          const tokenFromHash = decodeURIComponent(hash.replace("#token=", ""));
+          // store token and remove fragment to clean URL
+          localStorage.setItem("authToken", tokenFromHash);
+          // we don't have user details here; leave user null and let app fetch profile if needed
+          setToken(tokenFromHash);
+          // Remove the fragment without reloading
+          history.replaceState(
+            null,
+            "",
+            window.location.pathname + window.location.search
+          );
+        }
+      } catch (err) {
+        console.warn("Error parsing token from URL hash", err);
+      }
+
       // Check for stored auth data on component mount
       const storedToken = localStorage.getItem("authToken");
       const storedUser = localStorage.getItem("user");
@@ -42,10 +68,38 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           localStorage.removeItem("authToken");
           localStorage.removeItem("user");
         }
+      } else if (storedToken && !storedUser) {
+        // If we have a token but no stored user, fetch the profile to populate
+        // the user object so the app stays authenticated after OAuth redirect.
+        setToken(storedToken);
+        try {
+          const resp = await fetch("/api/auth/me", {
+            method: "GET",
+            headers: {
+              Authorization: `Bearer ${storedToken}`,
+              "Content-Type": "application/json",
+            },
+          });
+          const data = await resp.json();
+          if (data && data.success && data.data) {
+            setUser(data.data);
+            localStorage.setItem("user", JSON.stringify(data.data));
+          } else {
+            // token might be invalid; clear it
+            localStorage.removeItem("authToken");
+            setToken(null);
+          }
+        } catch (err) {
+          console.error("Error fetching user profile:", err);
+          localStorage.removeItem("authToken");
+          setToken(null);
+        }
       }
-    }
 
-    setIsLoading(false);
+      setIsLoading(false);
+    };
+
+    init();
   }, []);
 
   const login = (newToken: string, newUser: User) => {

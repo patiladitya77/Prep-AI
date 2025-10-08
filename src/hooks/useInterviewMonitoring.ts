@@ -4,8 +4,12 @@ import toast from "react-hot-toast";
 interface MonitoringOptions {
   onWarning: (type: "tab-switch" | "camera-look-away", count: number) => void;
   onInterviewTerminated: () => void;
+  // maximum number of warnings before termination
   maxWarnings?: number;
+  // whether monitoring is enabled
   enabled?: boolean;
+  // threshold in milliseconds for long continuous look-away to be considered a warning
+  continuousLookAwayThresholdMs?: number;
 }
 
 export const useInterviewMonitoring = ({
@@ -13,9 +17,12 @@ export const useInterviewMonitoring = ({
   onInterviewTerminated,
   maxWarnings = 3,
   enabled = true,
+  continuousLookAwayThresholdMs = 60 * 1000,
 }: MonitoringOptions) => {
   const [warningCount, setWarningCount] = useState(0);
   const [isMonitoring, setIsMonitoring] = useState(false);
+  const [hasStream, setHasStream] = useState(false);
+  const [isCalibrating, setIsCalibrating] = useState(true);
   const [detectionStatus, setDetectionStatus] = useState({
     faceDetected: false,
     eyesDetected: false,
@@ -26,11 +33,60 @@ export const useInterviewMonitoring = ({
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
-  const detectionIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const faceMeshRef = useRef<any>(null);
+  const cameraRef = useRef<any>(null);
+  const unloadCleanupRef = useRef<(() => void) | null>(null);
+  // Small smoothing counter to avoid rapid flicker between looking/away
+  const lookAtConfidenceRef = useRef<number>(0);
   const lookAwayTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const lastFrameDataRef = useRef<ImageData | null>(null);
   const lastToastRef = useRef<string>(""); // Track last toast to prevent duplicates
   const tabSwitchTimeRef = useRef<number>(Date.now());
+  const isTabAwayRef = useRef<boolean>(false);
+  // Track start time of a continuous look-away (long-duration)
+  const continuousLookAwayStartRef = useRef<number | null>(null);
+  const continuousLookAwayWarnedRef = useRef<boolean>(false);
+  // Refs to track current boolean state to avoid unnecessary setState calls
+  const isMonitoringRef = useRef<boolean>(false);
+  const hasStreamRef = useRef<boolean>(false);
+  const isStoppingRef = useRef<boolean>(false);
+
+  // Defensive: force-stop any MediaStreams attached to video elements in the page.
+  const forceReleaseAllVideoStreams = useCallback(() => {
+    try {
+      if (typeof window === "undefined" || !document) return;
+      const videos = Array.from(
+        document.querySelectorAll("video")
+      ) as HTMLVideoElement[];
+      videos.forEach((video) => {
+        try {
+          const so = video.srcObject as MediaStream | null;
+          if (so) {
+            try {
+              so.getTracks().forEach((t) => {
+                try {
+                  t.stop();
+                } catch (e) {
+                  // ignore
+                }
+              });
+            } catch (e) {
+              // ignore
+            }
+            try {
+              video.srcObject = null;
+            } catch (e) {
+              // ignore
+            }
+            // stopped tracks for this video element
+          }
+        } catch (err) {
+          // ignore per-video errors
+        }
+      });
+    } catch (err) {
+      console.warn("forceReleaseAllVideoStreams failed", err);
+    }
+  }, []);
 
   const addWarning = useCallback(
     (type: "tab-switch" | "camera-look-away") => {
@@ -45,11 +101,19 @@ export const useInterviewMonitoring = ({
 
       setWarningCount((currentCount) => {
         const newCount = currentCount + 1;
-        onWarning(type, newCount); // Only let InterviewUI handle the toast
 
-        if (newCount >= maxWarnings) {
-          onInterviewTerminated();
-        }
+        // Schedule side-effects after state update to avoid calling setState during render
+        Promise.resolve().then(() => {
+          try {
+            onWarning(type, newCount); // Only let InterviewUI handle the toast
+            if (newCount >= maxWarnings) {
+              onInterviewTerminated();
+            }
+          } catch (e) {
+            // swallow errors from user-provided callbacks
+            console.error("onWarning callback error", e);
+          }
+        });
 
         return newCount;
       });
@@ -57,263 +121,489 @@ export const useInterviewMonitoring = ({
     [maxWarnings, onWarning, onInterviewTerminated]
   );
 
-  // Simplified and reliable motion/presence detection
-  const detectFaceAndGaze = (imageData: ImageData) => {
-    const { data, width, height } = imageData;
+  // Keep refs in sync with state to avoid unneeded setState() calls
+  useEffect(() => {
+    isMonitoringRef.current = isMonitoring;
+  }, [isMonitoring]);
 
-    if (width === 0 || height === 0 || data.length === 0) {
-      return {
-        faceDetected: false,
-        eyesDetected: false,
-        lookingAtCamera: false,
-      };
+  useEffect(() => {
+    hasStreamRef.current = hasStream;
+  }, [hasStream]);
+
+  // MediaPipe-based face and eye detection
+  const initializeMediaPipe = useCallback(async () => {
+    // Only initialize on the client
+    if (typeof window === "undefined") {
+      console.warn("MediaPipe initialization skipped on server-side");
+      return;
     }
 
-    let totalBrightness = 0;
-    let varianceSum = 0;
-    let skinLikePixels = 0;
-    let darkPixels = 0;
-    let centerActivity = 0;
-    let totalSamples = 0;
-    let motionPixels = 0;
-    let edgePixels = 0; // For edge detection
-    let uniformPixels = 0; // For uniform background detection
+    if (faceMeshRef.current) return;
 
-    // Compare with previous frame for motion detection
-    const lastFrame = lastFrameDataRef.current;
-    const canCompareFrames =
-      lastFrame && lastFrame.width === width && lastFrame.height === height;
+    // Helper: attempt explicit imports in sequence (avoids dynamic import-of-variable warnings)
+    const tryExplicitImports = async () => {
+      // 1) Try package ESM
+      try {
+        const mod = await import("@mediapipe/face_mesh");
+        if (mod && (Object.keys(mod).length > 0 || (mod as any).default))
+          return mod;
+      } catch (e) {
+        console.warn("Import @mediapipe/face_mesh failed:", e);
+      }
 
-    // Simple but effective sampling every 8 pixels
-    for (let y = 0; y < height; y += 8) {
-      for (let x = 0; x < width; x += 8) {
-        const pixelIndex = (y * width + x) * 4;
-        if (pixelIndex + 3 >= data.length) continue;
+      // // 2) Try specific path
+      // try {
+      //   const mod = await import('@mediapipe/face_mesh/face_mesh.js');
+      //   if (mod && (Object.keys(mod).length > 0 || (mod as any).default)) return mod;
+      // } catch (e) {
+      //   console.warn('Import @mediapipe/face_mesh/face_mesh.js failed:', e);
+      // }
 
-        const r = data[pixelIndex];
-        const g = data[pixelIndex + 1];
-        const b = data[pixelIndex + 2];
+      // 3) No further static imports available in-bundle; return null to trigger script tag fallback
+      return null;
+    };
 
-        const brightness = (r + g + b) / 3;
-        totalBrightness += brightness;
+    try {
+      // console.log("🔧 Initializing MediaPipe FaceMesh (robust loader)...");
 
-        // Calculate variance (measure of detail/texture)
-        const avgColor = brightness;
-        const rVar = Math.pow(r - avgColor, 2);
-        const gVar = Math.pow(g - avgColor, 2);
-        const bVar = Math.pow(b - avgColor, 2);
-        varianceSum += (rVar + gVar + bVar) / 3;
+      // Try common import entry points
+      const FaceMeshModule = await tryExplicitImports();
+      // console.log(
+      //   "ℹ️ FaceMeshModule result:",
+      //   FaceMeshModule ? Object.keys(FaceMeshModule) : FaceMeshModule
+      // );
 
-        // Simplified and more inclusive skin detection
-        const isWarmTone = r > g && r > b && r > 70; // Basic warm tone
-        const isFleshTone = r > 80 && g > 40 && b > 20 && r > g; // Inclusive flesh tone
-        const isSkinLike = r > 60 && r > g && r > b && r - b > 5; // Very broad skin-like
-        const isValidSkin =
-          (isWarmTone || isFleshTone || isSkinLike) &&
-          brightness > 40 &&
-          brightness < 220;
+      // If still null, fall back to script tag loader
+      let faceMeshConstructor: any = null;
 
-        if (isValidSkin) {
-          skinLikePixels++;
+      if (FaceMeshModule) {
+        // Various export shapes
+        if ((FaceMeshModule as any).FaceMesh) {
+          faceMeshConstructor = (FaceMeshModule as any).FaceMesh;
+        } else if ((FaceMeshModule as any).default?.FaceMesh) {
+          faceMeshConstructor = (FaceMeshModule as any).default.FaceMesh;
+        } else if (typeof (FaceMeshModule as any).default === "function") {
+          faceMeshConstructor = (FaceMeshModule as any).default;
+        } else if (typeof FaceMeshModule === "function") {
+          faceMeshConstructor = FaceMeshModule as any;
         }
+      }
 
-        // Dark areas (could be hair, eyes, etc.) - more lenient
-        if (brightness < 100) {
-          // Simpler dark detection
-          darkPixels++;
-        }
-
-        // Edge detection for texture
-        if (x > 0 && y > 0) {
-          const prevPixelIndex = (y * width + (x - 1)) * 4;
-          const upPixelIndex = ((y - 1) * width + x) * 4;
-
-          if (
-            prevPixelIndex + 2 < data.length &&
-            upPixelIndex + 2 < data.length
-          ) {
-            const prevBrightness =
-              (data[prevPixelIndex] +
-                data[prevPixelIndex + 1] +
-                data[prevPixelIndex + 2]) /
-              3;
-            const upBrightness =
-              (data[upPixelIndex] +
-                data[upPixelIndex + 1] +
-                data[upPixelIndex + 2]) /
-              3;
-
-            if (
-              Math.abs(brightness - prevBrightness) > 20 ||
-              Math.abs(brightness - upBrightness) > 20
-            ) {
-              edgePixels++;
-            }
-          }
-        }
-
-        // Uniform background detection (static backgrounds have low variance)
-        if (
-          Math.abs(r - g) < 10 &&
-          Math.abs(g - b) < 10 &&
-          Math.abs(r - b) < 10
-        ) {
-          uniformPixels++;
-        }
-
-        // Center region activity
-        const centerX = width / 2;
-        const centerY = height / 2;
-        const distanceFromCenter = Math.sqrt(
-          (x - centerX) ** 2 + (y - centerY) ** 2
+      // If constructor still not found, try to load the global script
+      if (!faceMeshConstructor) {
+        console.warn(
+          "FaceMesh constructor not found in dynamic imports, trying script tag fallback..."
         );
 
-        if (distanceFromCenter < Math.min(width, height) * 0.3) {
-          centerActivity++;
+        await new Promise<void>((resolve, reject) => {
+          const existing = document.querySelector(
+            "script[data-mediapipe-face_mesh]"
+          );
+          if (existing) return resolve();
+
+          const s = document.createElement("script");
+          s.src =
+            "https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/face_mesh.js";
+          s.setAttribute("data-mediapipe-face_mesh", "1");
+          s.onload = () => resolve();
+          s.onerror = (ev) =>
+            reject(new Error("Failed to load MediaPipe script"));
+          document.head.appendChild(s);
+          // safety timeout
+          setTimeout(() => {
+            // If global still not present, reject
+            if (!(window as any).FaceMesh && !(window as any).faceMesh) {
+              reject(
+                new Error("MediaPipe script loaded but global not available")
+              );
+            } else {
+              resolve();
+            }
+          }, 8000);
+        }).catch((scriptErr) => {
+          console.warn("Script fallback failed:", scriptErr);
+        });
+
+        // try to read global now
+        faceMeshConstructor =
+          (window as any).FaceMesh ||
+          (window as any).face_mesh ||
+          (window as any).faceMeshModule ||
+          null;
+        // Sometimes CDN exposes a namespace where constructor is at FaceMesh.FaceMesh
+        if (
+          !faceMeshConstructor &&
+          (window as any).FaceMesh &&
+          (window as any).FaceMesh.FaceMesh
+        ) {
+          faceMeshConstructor = (window as any).FaceMesh.FaceMesh;
+        }
+      }
+
+      if (!faceMeshConstructor || typeof faceMeshConstructor !== "function") {
+        console.error("❌ FaceMesh constructor not found after all attempts", {
+          faceMeshConstructor,
+        });
+        throw new Error("FaceMesh constructor not found");
+      }
+
+      // console.log("✅ FaceMesh constructor resolved, creating instance...");
+
+      const faceMesh = new faceMeshConstructor({
+        locateFile: (file: string) =>
+          `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${file}`,
+      });
+
+      faceMesh.setOptions({
+        maxNumFaces: 1,
+        refineLandmarks: true,
+        minDetectionConfidence: 0.5,
+        minTrackingConfidence: 0.5,
+      });
+
+      // console.log("⚙️ Setting up FaceMesh configuration...");
+
+      faceMesh.onResults((results: any) => {
+        // Debug first few results
+        if (Math.random() < 0.02) {
+          // 2% of the time - debug output suppressed
+          // console.log("📊 MediaPipe Results:", {
+          //   hasFaces: !!(
+          //     results.multiFaceLandmarks &&
+          //     results.multiFaceLandmarks.length > 0
+          //   ),
+          //   faceCount: results.multiFaceLandmarks
+          //     ? results.multiFaceLandmarks.length
+          //     : 0,
+          //   imageSize: results.image
+          //     ? { width: results.image.width, height: results.image.height }
+          //     : null,
+          // });
         }
 
-        // Motion detection - compare with previous frame
-        if (canCompareFrames && lastFrame) {
-          const lastPixelIndex = (y * width + x) * 4;
-          if (lastPixelIndex + 3 < lastFrame.data.length) {
-            const lastR = lastFrame.data[lastPixelIndex];
-            const lastG = lastFrame.data[lastPixelIndex + 1];
-            const lastB = lastFrame.data[lastPixelIndex + 2];
+        if (
+          results.multiFaceLandmarks &&
+          results.multiFaceLandmarks.length > 0
+        ) {
+          const landmarks = results.multiFaceLandmarks[0];
 
-            const colorDiff =
-              Math.abs(r - lastR) + Math.abs(g - lastG) + Math.abs(b - lastB);
-            if (colorDiff > 30) {
-              // Threshold for motion
-              motionPixels++;
+          // Face detection
+          const faceDetected = Array.isArray(landmarks) && landmarks.length > 0;
+
+          // Safe getters (some builds may omit certain landmark indices)
+          const get = (i: number) =>
+            landmarks[i] ? landmarks[i] : { x: 0.5, y: 0.5, z: 0 };
+
+          // Eye detection - check specific eye landmark points (use safe getters)
+          const leftEyeTop = get(159);
+          const leftEyeBottom = get(145);
+          const rightEyeTop = get(386);
+          const rightEyeBottom = get(374);
+
+          // Calculate eye openness (make threshold more lenient)
+          const leftEyeHeight = Math.abs(leftEyeTop.y - leftEyeBottom.y);
+          const rightEyeHeight = Math.abs(rightEyeTop.y - rightEyeBottom.y);
+          const eyeOpenThreshold = 0.006; // relaxed threshold to treat slight eye openness as open
+
+          const eyesDetected =
+            faceDetected &&
+            leftEyeHeight > eyeOpenThreshold &&
+            rightEyeHeight > eyeOpenThreshold;
+
+          // Gaze detection - relaxed approach that treats looking at the screen as acceptable
+          const noseTip = get(1);
+          const leftCheek = get(234);
+          const rightCheek = get(454);
+
+          // Calculate face center and orientation (normalized coords)
+          const faceCenter = {
+            x: (leftCheek.x + rightCheek.x) / 2,
+            y: (leftCheek.y + rightCheek.y) / 2,
+          };
+
+          const noseOffset = {
+            x: Math.abs(noseTip.x - faceCenter.x),
+            y: Math.abs(noseTip.y - faceCenter.y),
+          };
+
+          // Relaxed thresholds: allow some horizontal offset (looking at screen instead of camera)
+          const noseOffsetXThreshold = 0.12; // wider allowance horizontally
+          const noseOffsetYThreshold = 0.1; // vertical tolerance
+
+          // Consider user looking if eyes are open AND either nose is near center OR face center is reasonably centered
+          const centeredEnough = Math.abs(faceCenter.x - 0.5) < 0.12;
+          const localLooking =
+            eyesDetected &&
+            ((noseOffset.x < noseOffsetXThreshold &&
+              noseOffset.y < noseOffsetYThreshold) ||
+              centeredEnough);
+
+          // Smoothing: small counter to avoid flicker on brief glances away
+          if (localLooking) {
+            lookAtConfidenceRef.current = Math.min(
+              5,
+              lookAtConfidenceRef.current + 1
+            );
+          } else {
+            lookAtConfidenceRef.current = Math.max(
+              0,
+              lookAtConfidenceRef.current - 1
+            );
+          }
+
+          const lookingAtCamera = lookAtConfidenceRef.current >= 2;
+
+          // Update detection status
+          setDetectionStatus({
+            faceDetected,
+            eyesDetected,
+            lookingAtCamera,
+          });
+
+          // Debug logging
+          if (Math.random() < 0.05) {
+            // 5% - debug detection logs suppressed
+            // console.log("🎯 MediaPipe Detection:", {
+            //   face: faceDetected ? "✅" : "❌",
+            //   eyes: eyesDetected ? "👀" : "❌",
+            //   gaze: lookingAtCamera ? "🎯" : "↗️",
+            //   eyeHeights: {
+            //     left: leftEyeHeight.toFixed(4),
+            //     right: rightEyeHeight.toFixed(4),
+            //   },
+            //   noseOffset: {
+            //     x: noseOffset.x.toFixed(4),
+            //     y: noseOffset.y.toFixed(4),
+            //   },
+            // });
+          }
+
+          // Handle violations
+          if (!faceDetected) {
+            if (!lookAwayTimeoutRef.current && !isCalibrating) {
+              lookAwayTimeoutRef.current = setTimeout(() => {
+                addWarning("camera-look-away");
+                lookAwayTimeoutRef.current = null;
+              }, 8000);
+            }
+          } else if (!eyesDetected) {
+            if (!lookAwayTimeoutRef.current && !isCalibrating) {
+              lookAwayTimeoutRef.current = setTimeout(() => {
+                addWarning("camera-look-away");
+                lookAwayTimeoutRef.current = null;
+              }, 12000);
+            }
+          } else if (!lookingAtCamera) {
+            if (!lookAwayTimeoutRef.current && !isCalibrating) {
+              lookAwayTimeoutRef.current = setTimeout(() => {
+                addWarning("camera-look-away");
+                lookAwayTimeoutRef.current = null;
+              }, 15000);
+            }
+          } else {
+            // Clear timeout if everything is detected properly
+            if (lookAwayTimeoutRef.current) {
+              clearTimeout(lookAwayTimeoutRef.current);
+              lookAwayTimeoutRef.current = null;
             }
           }
+
+          // Continuous look-away detection: if the user is continuously away (missing face or not
+          // looking at camera) for longer than the configured threshold, issue a single warning
+          // for that long-away period. This is separate from short-lived timeouts above.
+          try {
+            const isAwayLong = !faceDetected || !lookingAtCamera;
+            if (isAwayLong) {
+              if (continuousLookAwayStartRef.current === null) {
+                continuousLookAwayStartRef.current = Date.now();
+                continuousLookAwayWarnedRef.current = false;
+              } else {
+                const elapsed = Date.now() - continuousLookAwayStartRef.current;
+                if (
+                  !continuousLookAwayWarnedRef.current &&
+                  elapsed >= continuousLookAwayThresholdMs
+                ) {
+                  continuousLookAwayWarnedRef.current = true;
+                  addWarning("camera-look-away");
+                }
+              }
+            } else {
+              // user returned to camera — reset continuous-away tracking
+              if (continuousLookAwayStartRef.current !== null) {
+                continuousLookAwayStartRef.current = null;
+                continuousLookAwayWarnedRef.current = false;
+              }
+            }
+          } catch (err) {
+            // Defensive: don't let detection logic crash the handler
+            console.error("Continuous look-away check failed", err);
+          }
+        } else {
+          // No face detected
+          setDetectionStatus({
+            faceDetected: false,
+            eyesDetected: false,
+            lookingAtCamera: false,
+          });
+
+          if (!lookAwayTimeoutRef.current && !isCalibrating) {
+            lookAwayTimeoutRef.current = setTimeout(() => {
+              addWarning("camera-look-away");
+              lookAwayTimeoutRef.current = null;
+            }, 5000);
+          }
+
+          // When there's no face detected at all, start the continuous-away timer if not already
+          // running so that long periods of no face will trigger a single long-away warning.
+          try {
+            if (continuousLookAwayStartRef.current === null) {
+              continuousLookAwayStartRef.current = Date.now();
+              continuousLookAwayWarnedRef.current = false;
+            } else {
+              const elapsed = Date.now() - continuousLookAwayStartRef.current;
+              if (
+                !continuousLookAwayWarnedRef.current &&
+                elapsed >= continuousLookAwayThresholdMs
+              ) {
+                continuousLookAwayWarnedRef.current = true;
+                addWarning("camera-look-away");
+              }
+            }
+          } catch (err) {
+            console.error("Continuous look-away (no-face) check failed", err);
+          }
         }
+      });
 
-        totalSamples++;
+      faceMeshRef.current = faceMesh;
+      // console.log("✅ MediaPipe FaceMesh initialized successfully");
+    } catch (error) {
+      console.error("❌ Failed to initialize MediaPipe:", error);
+      console.error("Error details:", {
+        message: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
+        name: error instanceof Error ? error.name : typeof error,
+      });
+
+      // Try alternative approach using script loading
+      // console.log("🔄 Attempting alternative MediaPipe loading...");
+      try {
+        // Alternative: Load MediaPipe via global script approach
+        const faceMeshScript = document.createElement("script");
+        faceMeshScript.src =
+          "https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/face_mesh.js";
+        document.head.appendChild(faceMeshScript);
+
+        await new Promise((resolve, reject) => {
+          faceMeshScript.onload = resolve;
+          faceMeshScript.onerror = reject;
+          setTimeout(reject, 10000); // 10 second timeout
+        });
+
+        // Check if MediaPipe is available globally
+        if ((window as any).FaceMesh) {
+          // console.log("✅ MediaPipe loaded via script tag");
+          const faceMesh = new (window as any).FaceMesh({
+            locateFile: (file: string) =>
+              `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${file}`,
+          });
+
+          faceMesh.setOptions({
+            maxNumFaces: 1,
+            refineLandmarks: true,
+            minDetectionConfidence: 0.5,
+            minTrackingConfidence: 0.5,
+          });
+
+          // Set up the same onResults handler
+          faceMesh.onResults((results: any) => {
+            // Same detection logic as before
+            if (
+              results.multiFaceLandmarks &&
+              results.multiFaceLandmarks.length > 0
+            ) {
+              const landmarks = results.multiFaceLandmarks[0];
+              const faceDetected = landmarks && landmarks.length > 0;
+              setDetectionStatus({
+                faceDetected,
+                eyesDetected: faceDetected,
+                lookingAtCamera: faceDetected,
+              });
+            } else {
+              setDetectionStatus({
+                faceDetected: false,
+                eyesDetected: false,
+                lookingAtCamera: false,
+              });
+            }
+          });
+
+          faceMeshRef.current = faceMesh;
+          // console.log("✅ Alternative MediaPipe initialization successful");
+          return; // Exit successfully
+        }
+      } catch (scriptError) {
+        console.error("❌ Alternative MediaPipe loading failed:", scriptError);
       }
-    }
 
-    if (totalSamples === 0) {
-      console.warn("⚠️ No samples processed");
-      return {
-        faceDetected: false,
-        eyesDetected: false,
-        lookingAtCamera: false,
+      // Deduplicated toast informing user about face-detection fallback
+      toast.error(
+        "Face detection unavailable. Using monitoring without face tracking.",
+        { id: "face-detection-unavailable" }
+      );
+
+      // Set up a basic fallback detection
+      faceMeshRef.current = {
+        send: () => {
+          // Basic fallback - assume face is present if video is working
+          setDetectionStatus({
+            faceDetected: true,
+            eyesDetected: true,
+            lookingAtCamera: true,
+          });
+        },
+        close: () => {},
       };
     }
+  }, [isCalibrating, addWarning]);
 
-    const avgBrightness = totalBrightness / totalSamples;
-    const avgVariance = varianceSum / totalSamples;
-    const skinRatio = skinLikePixels / totalSamples;
-    const darkRatio = darkPixels / totalSamples;
-    const centerRatio = centerActivity / totalSamples;
-    const motionRatio = motionPixels / totalSamples;
-    const edgeRatio = edgePixels / totalSamples;
-    const uniformRatio = uniformPixels / totalSamples;
-
-    // Track if frame looks like empty background
-    const looksEmpty =
-      uniformRatio > 0.8 || (avgVariance < 15 && skinRatio < 0.02);
-
-    // Store current frame for next comparison
-    lastFrameDataRef.current = new ImageData(
-      new Uint8ClampedArray(data),
-      width,
-      height
-    );
-
-    // Properly balanced detection - strict enough to detect absence, lenient enough for presence
-    const hasActivity = avgVariance > 20; // Moderate threshold for activity
-    const hasWarmTones = skinRatio > 0.05; // At least 5% warm/skin tones
-    const hasDarkAreas = darkRatio > 0.08; // At least 8% dark areas (eyes, hair)
-    const hasCenterActivity = centerRatio > 0.12; // Activity in center (face positioning)
-    const hasEdges = edgeRatio > 0.12; // Need texture/edges for a person
-    const notTooUniform = uniformRatio < 0.75; // Not too much uniform background
-    const goodLighting = avgBrightness > 30 && avgBrightness < 190; // Good lighting range
-    const hasEnoughContrast = avgVariance > 20; // Moderate contrast requirement
-
-    // Require multiple conditions to be true AND not look empty
-    const faceDetected =
-      hasWarmTones &&
-      hasActivity &&
-      goodLighting &&
-      hasEnoughContrast &&
-      notTooUniform &&
-      !looksEmpty;
-    const eyesDetected = faceDetected && hasDarkAreas;
-    const lookingAtCamera = eyesDetected && hasCenterActivity;
-
-    // Test mode disabled - using real detection
-    const testMode = false;
-
-    // More frequent logging for debugging detection issues
-    if (Math.random() < 0.5) {
-      // 50% of the time for debugging
-      console.log("🔍 Detection Analysis:", {
-        results: {
-          face: faceDetected ? "✅ DETECTED" : "❌ NOT FOUND",
-          eyes: eyesDetected ? "👀 DETECTED" : "❌ NOT FOUND",
-          contact: lookingAtCamera ? "🎯 LOOKING" : "👀 AWAY",
-        },
-        metrics: {
-          brightness: avgBrightness.toFixed(1),
-          variance: avgVariance.toFixed(1),
-          skin: (skinRatio * 100).toFixed(1) + "%",
-          dark: (darkRatio * 100).toFixed(1) + "%",
-          center: (centerRatio * 100).toFixed(1) + "%",
-          motion: (motionRatio * 100).toFixed(1) + "%",
-          edges: (edgeRatio * 100).toFixed(1) + "%",
-          uniform: (uniformRatio * 100).toFixed(1) + "%",
-        },
-        checks: {
-          hasActivity: hasActivity ? "✅" : "❌",
-          hasWarmTones: hasWarmTones ? "✅" : "❌",
-          hasDarkAreas: hasDarkAreas ? "✅" : "❌",
-          hasCenterActivity: hasCenterActivity ? "✅" : "❌",
-          hasEdges: hasEdges ? "✅" : "❌",
-          notTooUniform: notTooUniform ? "✅" : "❌",
-          goodLighting: goodLighting ? "✅" : "❌",
-          hasContrast: hasEnoughContrast ? "✅" : "❌",
-          notEmpty: !looksEmpty ? "✅" : "❌",
-        },
-      });
-    }
-
-    return { faceDetected, eyesDetected, lookingAtCamera };
-  };
-
-  // Enhanced tab switching detection
+  // Enhanced tab switching detection with proper state management
   useEffect(() => {
     if (!enabled) return;
 
-    let isUserAway = false;
-    let awayStartTime = 0;
-    let warningTimeout: NodeJS.Timeout | null = null;
+    let warningTimeoutId: NodeJS.Timeout | null = null;
 
     const handleVisibilityChange = () => {
-      if (document.hidden) {
-        if (!isUserAway) {
-          isUserAway = true;
-          awayStartTime = Date.now();
+      // console.log(
+      //   "👁️ Visibility changed:",
+      //   document.hidden ? "HIDDEN" : "VISIBLE"
+      // );
 
-          // Give immediate warning for tab switching
-          warningTimeout = setTimeout(() => {
-            if (isUserAway) {
-              addWarning("tab-switch");
-            }
-          }, 500);
+      if (document.hidden) {
+        // Tab became hidden
+        if (!isTabAwayRef.current) {
+          isTabAwayRef.current = true;
+          tabSwitchTimeRef.current = Date.now();
+          // console.log("⚠️ Tab switched away - issuing immediate warning");
+          addWarning("tab-switch");
         }
       } else {
-        if (isUserAway) {
-          isUserAway = false;
-          if (warningTimeout) {
-            clearTimeout(warningTimeout);
-            warningTimeout = null;
-          }
+        // Tab became visible again
+        const wasAway = isTabAwayRef.current;
+        isTabAwayRef.current = false;
 
-          const awayDuration = Date.now() - awayStartTime;
-          // If away for more than 1 second, still count as violation
-          if (awayDuration > 1000) {
+        if (warningTimeoutId) {
+          clearTimeout(warningTimeoutId);
+          warningTimeoutId = null;
+        }
+
+        if (wasAway) {
+          const awayDuration = Date.now() - tabSwitchTimeRef.current;
+          // console.log(`👁️ Tab was away for ${awayDuration}ms`);
+
+          // Also record an additional warning for long away durations
+          if (awayDuration > 2000) {
+            // console.log("⚠️ Long tab switch violation (additional)");
             addWarning("tab-switch");
           }
         }
@@ -321,31 +611,34 @@ export const useInterviewMonitoring = ({
     };
 
     const handleFocus = () => {
-      if (isUserAway && !document.hidden) {
-        isUserAway = false;
-        if (warningTimeout) {
-          clearTimeout(warningTimeout);
-          warningTimeout = null;
-        }
+      // console.log("🔍 Window focused");
+      isTabAwayRef.current = false;
+
+      if (warningTimeoutId) {
+        clearTimeout(warningTimeoutId);
+        warningTimeoutId = null;
       }
     };
 
     const handleBlur = () => {
-      if (!isUserAway) {
-        isUserAway = true;
-        awayStartTime = Date.now();
-
-        // Immediate warning for window blur
-        warningTimeout = setTimeout(() => {
-          if (isUserAway) {
-            addWarning("tab-switch");
-          }
-        }, 500); // Even faster warning for blur
+      // console.log("😵‍💫 Window blurred");
+      // Treat blur as an immediate tab-away event
+      if (!isTabAwayRef.current) {
+        isTabAwayRef.current = true;
+        tabSwitchTimeRef.current = Date.now();
+        // console.log("⚠️ Window blurred - issuing immediate warning");
+        addWarning("tab-switch");
       }
     };
 
     // Enhanced keyboard shortcut prevention
     const handleKeyDown = (e: KeyboardEvent) => {
+      // console.log("⌨️ Key pressed:", e.code, {
+      //   alt: e.altKey,
+      //   ctrl: e.ctrlKey,
+      //   shift: e.shiftKey,
+      // });
+
       // Prevent Alt+Tab, Ctrl+Tab, F12 (DevTools), etc.
       const blockedKeys = [
         e.altKey && e.code === "Tab",
@@ -366,6 +659,7 @@ export const useInterviewMonitoring = ({
       ];
 
       if (blockedKeys.some((blocked) => blocked)) {
+        // console.log("🚫 Blocked key combination detected");
         e.preventDefault();
         e.stopPropagation();
         addWarning("tab-switch");
@@ -376,43 +670,12 @@ export const useInterviewMonitoring = ({
 
     // Enhanced context menu prevention
     const handleContextMenu = (e: MouseEvent) => {
+      // console.log("🖱️ Right-click blocked");
       e.preventDefault();
       e.stopPropagation();
       addWarning("tab-switch");
       toast.error("⚠️ Right-click is disabled during interview!");
       return false;
-    };
-
-    // Mouse leave detection (user moving to other applications)
-    const handleMouseLeave = (e: MouseEvent) => {
-      // If mouse leaves the window area completely
-      if (
-        e.clientY <= 0 ||
-        e.clientX <= 0 ||
-        e.clientX >= window.innerWidth ||
-        e.clientY >= window.innerHeight
-      ) {
-        if (!isUserAway) {
-          isUserAway = true;
-          awayStartTime = Date.now();
-
-          warningTimeout = setTimeout(() => {
-            if (isUserAway) {
-              addWarning("tab-switch");
-            }
-          }, 2000); // 2 seconds for mouse leave
-        }
-      }
-    };
-
-    const handleMouseEnter = () => {
-      if (isUserAway) {
-        isUserAway = false;
-        if (warningTimeout) {
-          clearTimeout(warningTimeout);
-          warningTimeout = null;
-        }
-      }
     };
 
     // Add all event listeners
@@ -421,29 +684,38 @@ export const useInterviewMonitoring = ({
     window.addEventListener("blur", handleBlur);
     document.addEventListener("keydown", handleKeyDown, true); // Use capture phase
     document.addEventListener("contextmenu", handleContextMenu, true);
-    document.addEventListener("mouseleave", handleMouseLeave);
-    document.addEventListener("mouseenter", handleMouseEnter);
 
     // Cleanup
     return () => {
-      if (warningTimeout) clearTimeout(warningTimeout);
+      if (warningTimeoutId) clearTimeout(warningTimeoutId);
       document.removeEventListener("visibilitychange", handleVisibilityChange);
       window.removeEventListener("focus", handleFocus);
       window.removeEventListener("blur", handleBlur);
       document.removeEventListener("keydown", handleKeyDown, true);
       document.removeEventListener("contextmenu", handleContextMenu, true);
-      document.removeEventListener("mouseleave", handleMouseLeave);
-      document.removeEventListener("mouseenter", handleMouseEnter);
     };
   }, [enabled, addWarning]);
 
-  // Simple camera monitoring
+  // MediaPipe-powered camera monitoring
   const startCameraMonitoring = useCallback(async () => {
     if (!enabled || isMonitoring) {
+      // console.log("📹 Camera start skipped:", { enabled, isMonitoring });
       return;
     }
 
+    // console.log("📹 Starting MediaPipe camera initialization...");
+
     try {
+      // Initialize MediaPipe
+      await initializeMediaPipe();
+
+      // Check if getUserMedia is available
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        throw new Error("getUserMedia not supported");
+      }
+
+      // console.log("📹 Requesting camera access...");
+
       // Get camera access
       const stream = await navigator.mediaDevices.getUserMedia({
         video: {
@@ -454,9 +726,56 @@ export const useInterviewMonitoring = ({
         audio: false,
       });
 
-      streamRef.current = stream;
+      // console.log(
+      //   "📹 Camera stream obtained:",
+      //   stream.getVideoTracks().length,
+      //   "video tracks"
+      // );
 
-      if (videoRef.current) {
+      streamRef.current = stream;
+      setHasStream(true);
+
+      // Synchronous cleanup to stop tracks on refresh/unload so camera is released immediately
+      try {
+        const syncCleanup = () => {
+          try {
+            if (streamRef.current) {
+              streamRef.current.getTracks().forEach((t) => {
+                try {
+                  t.stop();
+                } catch (e) {
+                  // ignore
+                }
+              });
+            }
+          } catch (e) {
+            // ignore
+          }
+          try {
+            forceReleaseAllVideoStreams();
+          } catch (e) {
+            // ignore
+          }
+        };
+
+        window.addEventListener("beforeunload", syncCleanup, true);
+        window.addEventListener("pagehide", syncCleanup, true);
+
+        // Store for removal when stopping monitoring
+        unloadCleanupRef.current = () => {
+          try {
+            window.removeEventListener("beforeunload", syncCleanup, true);
+          } catch (e) {}
+          try {
+            window.removeEventListener("pagehide", syncCleanup, true);
+          } catch (e) {}
+        };
+      } catch (e) {
+        // ignore if window not available
+      }
+
+      if (videoRef.current && faceMeshRef.current) {
+        // console.log("📹 Setting up video element with MediaPipe...");
         const video = videoRef.current;
         video.srcObject = stream;
         video.muted = true;
@@ -464,171 +783,396 @@ export const useInterviewMonitoring = ({
 
         // Wait for video to be ready
         await new Promise<void>((resolve, reject) => {
-          const timeout = setTimeout(
-            () => reject(new Error("Video timeout")),
-            10000
-          );
+          const timeout = setTimeout(() => {
+            console.error("⏱️ Video loading timeout");
+            reject(new Error("Video timeout"));
+          }, 10000);
 
           video.onloadedmetadata = () => {
+            // console.log("📹 Video metadata loaded:", {
+            //   width: video.videoWidth,
+            //   height: video.videoHeight,
+            //   readyState: video.readyState,
+            // });
             clearTimeout(timeout);
             resolve();
           };
 
-          video.onerror = () => {
+          video.onerror = (error) => {
+            console.error("❌ Video element error:", error);
             clearTimeout(timeout);
             reject(new Error("Video error"));
           };
         });
 
+        // console.log("📹 Playing video...");
         await video.play();
+        // console.log("📹 Video playing successfully");
         setIsMonitoring(true);
+        setIsCalibrating(true);
 
-        // Start detection after a short delay
+        // End calibration period after 5 seconds
         setTimeout(() => {
-          const runDetection = () => {
-            const currentVideo = videoRef.current;
-            const currentCanvas = canvasRef.current;
+          setIsCalibrating(false);
+          // console.log("🎯 Calibration period ended - full monitoring active");
+        }, 5000);
 
-            if (!currentVideo || !currentCanvas) return;
+        // Initialize Camera utility for MediaPipe
+        try {
+          // console.log("📷 Initializing MediaPipe Camera utility...");
+          const CameraModule = await import("@mediapipe/camera_utils");
 
-            const ctx = currentCanvas.getContext("2d");
-            if (
-              !ctx ||
-              currentVideo.readyState < 2 ||
-              currentVideo.videoWidth === 0
-            )
-              return;
+          // console.log("📦 Camera module loaded:", {
+          //   module: CameraModule,
+          //   hasDefault: "default" in CameraModule,
+          //   hasCamera: "Camera" in CameraModule,
+          //   keys: Object.keys(CameraModule),
+          //   defaultKeys: CameraModule.default
+          //     ? Object.keys(CameraModule.default)
+          //     : null,
+          // });
 
+          // Helper to resolve constructor from various export shapes
+          const resolveCameraConstructor = (mod: any) => {
+            if (!mod) return null;
+            if (mod.Camera) return mod.Camera;
+            if (mod.default?.Camera) return mod.default.Camera;
+            if (typeof mod.default === "function") return mod.default;
+            if (typeof mod === "function") return mod;
+
+            // Try nested keys in case library wraps exports
             try {
-              // Draw current frame
-              currentCanvas.width = currentVideo.videoWidth;
-              currentCanvas.height = currentVideo.videoHeight;
-              ctx.drawImage(currentVideo, 0, 0);
+              for (const k of Object.keys(mod)) {
+                const v = mod[k];
+                if (!v) continue;
+                if (v.Camera) return v.Camera;
+                if (typeof v === "function") return v;
+              }
+            } catch (e) {
+              // ignore
+            }
 
-              // Test: Draw a small indicator to show canvas is working
-              ctx.fillStyle = "red";
-              ctx.fillRect(0, 0, 10, 10);
+            // Check window globals (script tag fallback might expose this)
+            if ((window as any).Camera) return (window as any).Camera;
+            if (
+              (window as any).cameraUtils &&
+              (window as any).cameraUtils.Camera
+            )
+              return (window as any).cameraUtils.Camera;
+            return null;
+          };
 
-              // Get image data
-              const imageData = ctx.getImageData(
-                0,
-                0,
-                currentCanvas.width,
-                currentCanvas.height
-              );
+          let camera: any = null;
+          const CameraConstructor = resolveCameraConstructor(CameraModule);
 
-              // Quick sanity check
-              const samplePixel = imageData.data.slice(0, 12); // First 3 pixels
-              console.log("� Frame captured:", {
-                size: `${currentCanvas.width}x${currentCanvas.height}`,
-                dataSize: imageData.data.length,
-                samplePixels: Array.from(samplePixel),
+          if (CameraConstructor && typeof CameraConstructor === "function") {
+            try {
+              // console.log(
+              //   "✅ Camera constructor resolved, creating instance..."
+              // );
+              camera = new CameraConstructor(video, {
+                onFrame: async () => {
+                  if (
+                    faceMeshRef.current &&
+                    typeof faceMeshRef.current.send === "function"
+                  ) {
+                    try {
+                      await faceMeshRef.current.send({ image: video });
+                    } catch (sendError) {
+                      console.error(
+                        "❌ Error sending frame to FaceMesh:",
+                        sendError
+                      );
+                    }
+                  }
+                },
+                width: 640,
+                height: 480,
               });
 
-              // Run detection
-              const detection = detectFaceAndGaze(imageData);
+              // start may be async or sync
+              if (typeof camera.start === "function") {
+                await camera.start();
+              }
+              cameraRef.current = camera;
+              // console.log("✅ MediaPipe Camera started successfully");
+            } catch (instErr) {
+              console.error(
+                "❌ Error instantiating Camera constructor:",
+                instErr
+              );
+              camera = null;
+            }
+          } else {
+            // console.warn(
+            //   "⚠️ Camera constructor not resolved; will use manual frame processing fallback."
+            // );
+          }
 
-              // Update status with real detection results
-              setDetectionStatus(detection);
+          // If camera wasn't created, fallback to manual frame processing
+          if (!camera) {
+            // console.log("🔄 Using manual frame processing fallback...");
 
-              // Handle violations with responsive timeouts
-              if (!detection.faceDetected) {
-                if (!lookAwayTimeoutRef.current) {
-                  lookAwayTimeoutRef.current = setTimeout(() => {
-                    addWarning("camera-look-away");
-                    lookAwayTimeoutRef.current = null;
-                  }, 5000); // 5 seconds for no face detected
-                }
-              } else if (!detection.eyesDetected) {
-                if (!lookAwayTimeoutRef.current) {
-                  lookAwayTimeoutRef.current = setTimeout(() => {
-                    addWarning("camera-look-away");
-                    lookAwayTimeoutRef.current = null;
-                  }, 7000); // 7 seconds for no eyes detected
-                }
-              } else if (!detection.lookingAtCamera) {
-                if (!lookAwayTimeoutRef.current) {
-                  lookAwayTimeoutRef.current = setTimeout(() => {
-                    addWarning("camera-look-away");
-                    lookAwayTimeoutRef.current = null;
-                  }, 10000); // 10 seconds for not looking at camera
-                }
-              } else {
-                // Clear timeout if everything is detected properly
-                if (lookAwayTimeoutRef.current) {
-                  clearTimeout(lookAwayTimeoutRef.current);
-                  lookAwayTimeoutRef.current = null;
+            const processFrame = () => {
+              if (
+                faceMeshRef.current &&
+                video.readyState >= 2 &&
+                typeof faceMeshRef.current.send === "function"
+              ) {
+                try {
+                  faceMeshRef.current.send({ image: video });
+                } catch (sendError) {
+                  console.error(
+                    "❌ Error in manual frame processing:",
+                    sendError
+                  );
                 }
               }
 
-              // Log detection status occasionally
-              if (Math.random() < 0.05) {
-                // Only log 5% of the time
-                console.log("Detection status:", detection);
+              // Continue processing until explicitly stopped
+              if (cameraRef.current !== null) {
+                requestAnimationFrame(processFrame);
               }
-            } catch (error) {
-              console.error("Detection error:", error);
+            };
+
+            // marker object with stop method to signal loop termination
+            cameraRef.current = {
+              stop: () => {
+                cameraRef.current = null;
+              },
+            };
+            requestAnimationFrame(processFrame);
+          }
+        } catch (cameraError) {
+          console.error(
+            "❌ Failed to initialize MediaPipe Camera:",
+            cameraError
+          );
+
+          // Fallback: Use requestAnimationFrame for manual frame processing
+          // console.log(
+          //   "🔄 Using manual frame processing fallback due to error..."
+          // );
+
+          const processFrame = () => {
+            if (
+              faceMeshRef.current &&
+              video.readyState >= 2 &&
+              typeof faceMeshRef.current.send === "function"
+            ) {
+              try {
+                faceMeshRef.current.send({ image: video });
+              } catch (sendError) {
+                console.error(
+                  "❌ Error in manual frame processing:",
+                  sendError
+                );
+              }
+            }
+
+            if (cameraRef.current !== null) {
+              // Continue if not stopped
+              requestAnimationFrame(processFrame);
             }
           };
 
-          detectionIntervalRef.current = setInterval(runDetection, 500); // Check every 500ms for more responsive detection
-        }, 2000);
+          // Start manual processing
+          cameraRef.current = {
+            stop: () => {
+              cameraRef.current = null;
+            },
+          };
+          requestAnimationFrame(processFrame);
+        }
 
-        console.log("📹 Camera monitoring started successfully");
+        // console.log("📹 MediaPipe camera monitoring started successfully");
       } else {
-        throw new Error("Video element not found");
+        console.error("❌ Video element or MediaPipe not ready");
+        setHasStream(false);
+        throw new Error("Video element or MediaPipe not found");
       }
     } catch (error) {
-      console.error("Camera error:", error);
+      console.error("❌ Camera error:", error);
 
       const errorName = (error as any)?.name || "";
-      console.warn("Camera error:", errorName);
-      // Silently continue without camera - only show toast on user action
+      console.warn("⚠️ Camera initialization failed:", errorName);
+
+      // Set hasStream to false on error
+      setHasStream(false);
+
+      // Provide specific error messages for different camera issues
+      if (errorName === "NotAllowedError") {
+        toast.error(
+          "📷 Camera permission denied. Please allow camera access and retry.",
+          { id: "camera-permission-denied" }
+        );
+      } else if (errorName === "NotFoundError") {
+        toast.error("📷 No camera found. Please connect a camera and retry.", {
+          id: "camera-not-found",
+        });
+      } else if (errorName === "NotReadableError") {
+        toast.error(
+          "📷 Camera is being used by another application. Please close other apps and retry.",
+          { id: "camera-in-use" }
+        );
+      } else {
+        toast.error(
+          "📷 Camera access failed. Please check your camera settings and retry.",
+          { id: "camera-access-failed" }
+        );
+      }
 
       setIsMonitoring(true); // Enable tab monitoring anyway
     }
-  }, [enabled]); // Remove isMonitoring and addWarning from dependencies
+  }, [enabled, initializeMediaPipe]); // Add initializeMediaPipe dependency
 
   const stopCameraMonitoring = useCallback(() => {
-    if (detectionIntervalRef.current) {
-      clearInterval(detectionIntervalRef.current);
-      detectionIntervalRef.current = null;
-    }
+    // console.log("🛑 Stopping MediaPipe camera monitoring...");
 
-    if (lookAwayTimeoutRef.current) {
-      clearTimeout(lookAwayTimeoutRef.current);
-      lookAwayTimeoutRef.current = null;
+    // Prevent re-entrant calls
+    if (isStoppingRef.current) {
+      // console.log("🛑 stopCameraMonitoring already running, skipping re-entry");
+      return;
     }
+    isStoppingRef.current = true;
 
-    if (streamRef.current) {
-      streamRef.current
-        .getTracks()
-        .forEach((track: MediaStreamTrack) => track.stop());
-      streamRef.current = null;
+    // Stop MediaPipe camera
+    try {
+      // (pre-stop debug logs removed)
+      if (cameraRef.current && typeof cameraRef.current.stop === "function") {
+        try {
+          cameraRef.current.stop();
+        } catch (e) {
+          console.warn("⚠️ Error stopping cameraRef:", e);
+        }
+        cameraRef.current = null;
+      }
+
+      // Clear MediaPipe FaceMesh
+      if (faceMeshRef.current) {
+        try {
+          if (typeof faceMeshRef.current.close === "function") {
+            faceMeshRef.current.close();
+          }
+        } catch (e) {
+          console.warn("⚠️ Error closing faceMeshRef:", e);
+        }
+        faceMeshRef.current = null;
+      }
+
+      if (lookAwayTimeoutRef.current) {
+        clearTimeout(lookAwayTimeoutRef.current);
+        lookAwayTimeoutRef.current = null;
+      }
+
+      if (streamRef.current) {
+        try {
+          streamRef.current
+            .getTracks()
+            .forEach((track: MediaStreamTrack) => track.stop());
+        } catch (e) {
+          console.warn("⚠️ Error stopping stream tracks:", e);
+        }
+        streamRef.current = null;
+      }
+
+      // Remove synchronous unload handlers if registered
+      try {
+        if (unloadCleanupRef.current) {
+          unloadCleanupRef.current();
+          unloadCleanupRef.current = null;
+        }
+      } catch (e) {
+        // ignore
+      }
+
+      // Also defensively clear any video element streams that might still exist
+      try {
+        forceReleaseAllVideoStreams();
+      } catch (e) {
+        // ignore
+      }
+
+      // (post-stop debug logs removed)
+
+      // Only update React state when the new value differs from the current one
+      if (isMonitoringRef.current) {
+        setIsMonitoring(false);
+      }
+      if (hasStreamRef.current) {
+        setHasStream(false);
+      }
+      // Always reset calibration flag so next start can recalibrate
+      setIsCalibrating(true); // Reset calibration for next time
+      setDetectionStatus((prev) => {
+        if (
+          prev.faceDetected === false &&
+          prev.eyesDetected === false &&
+          prev.lookingAtCamera === false
+        ) {
+          return prev; // no change
+        }
+        return {
+          faceDetected: false,
+          eyesDetected: false,
+          lookingAtCamera: false,
+        };
+      });
+    } catch (e) {
+      console.error("❌ Error during stopCameraMonitoring:", e);
+    } finally {
+      isStoppingRef.current = false;
     }
-
-    setIsMonitoring(false);
-    setDetectionStatus({
-      faceDetected: false,
-      eyesDetected: false,
-      lookingAtCamera: false,
-    });
   }, []); // No dependencies to avoid loops
 
   // Cleanup on unmount only
   useEffect(() => {
     return () => {
       // Direct cleanup without calling the callback
-      if (detectionIntervalRef.current) {
-        clearInterval(detectionIntervalRef.current);
+      try {
+        if (cameraRef.current && typeof cameraRef.current.stop === "function") {
+          cameraRef.current.stop();
+        }
+      } catch (e) {
+        console.warn("⚠️ Error stopping camera on unmount:", e);
       }
+
+      try {
+        if (
+          faceMeshRef.current &&
+          typeof faceMeshRef.current.close === "function"
+        ) {
+          faceMeshRef.current.close();
+        }
+      } catch (e) {
+        console.warn("⚠️ Error closing faceMesh on unmount:", e);
+      }
+
       if (lookAwayTimeoutRef.current) {
         clearTimeout(lookAwayTimeoutRef.current);
       }
+
       if (streamRef.current) {
-        streamRef.current
-          .getTracks()
-          .forEach((track: MediaStreamTrack) => track.stop());
+        try {
+          streamRef.current
+            .getTracks()
+            .forEach((track: MediaStreamTrack) => track.stop());
+        } catch (e) {
+          console.warn("⚠️ Error stopping stream tracks on unmount:", e);
+        }
+      }
+      try {
+        forceReleaseAllVideoStreams();
+      } catch (e) {
+        // ignore
+      }
+      try {
+        if (unloadCleanupRef.current) {
+          unloadCleanupRef.current();
+          unloadCleanupRef.current = null;
+        }
+      } catch (e) {
+        // ignore
       }
     };
   }, []); // Empty dependency array for cleanup only
@@ -641,5 +1185,7 @@ export const useInterviewMonitoring = ({
     canvasRef,
     startCameraMonitoring,
     stopCameraMonitoring,
+    hasStream,
+    isCalibrating,
   };
 };
