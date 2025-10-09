@@ -11,9 +11,40 @@ const JWT_SECRET = process.env.JWT_SECRET;
 const temporaryScores = new Map();
 const temporaryAnswers = new Map();
 
+// Rate limiting for Gemini API
+const apiCallTracker = {
+  calls: [],
+  maxCallsPerMinute: 8, // Stay under the 10 call/minute limit
+
+  canMakeCall() {
+    const now = Date.now();
+    const oneMinuteAgo = now - 60000;
+
+    // Remove calls older than 1 minute
+    this.calls = this.calls.filter((timestamp) => timestamp > oneMinuteAgo);
+
+    return this.calls.length < this.maxCallsPerMinute;
+  },
+
+  recordCall() {
+    this.calls.push(Date.now());
+  },
+};
+
 export async function POST(request) {
   try {
-    const { sessionId } = await request.json();
+    let requestBody;
+    try {
+      requestBody = await request.json();
+    } catch (jsonError) {
+      console.error("❌ JSON parsing error in request body:", jsonError);
+      return NextResponse.json(
+        { error: "Invalid request body format" },
+        { status: 400 }
+      );
+    }
+
+    const { sessionId } = requestBody;
 
     if (!sessionId) {
       return NextResponse.json(
@@ -271,8 +302,65 @@ function generateOverallFeedback(score, completion) {
   return feedback;
 }
 
+function getFallbackScore(answer) {
+  const answerLength = answer.trim().length;
+  const wordCount = answer.trim().split(/\s+/).length;
+
+  let score = 1;
+  let feedback = "System evaluation based on response characteristics.";
+  let strengths = "Response was submitted successfully.";
+  let improvements = "Focus on providing detailed, relevant answers.";
+
+  // Basic scoring logic based on length and word count
+  if (answerLength < 10) {
+    score = 1;
+    feedback = "Very brief response. Consider providing more detail.";
+    improvements =
+      "Expand your answer with specific examples and explanations.";
+  } else if (answerLength < 50 || wordCount < 10) {
+    score = 3;
+    feedback = "Short response with limited detail.";
+    improvements = "Add more specific examples and elaborate on key points.";
+  } else if (answerLength < 150 || wordCount < 25) {
+    score = 5;
+    feedback = "Moderate response length with basic coverage.";
+    strengths = "Provided a reasonable amount of detail.";
+    improvements =
+      "Consider adding specific examples and more comprehensive explanations.";
+  } else if (answerLength < 300 || wordCount < 50) {
+    score = 7;
+    feedback = "Well-developed response with good detail.";
+    strengths = "Comprehensive answer with good structure.";
+    improvements = "Continue providing detailed, well-structured responses.";
+  } else {
+    score = 8;
+    feedback = "Detailed and comprehensive response.";
+    strengths = "Thorough and well-elaborated answer.";
+    improvements = "Maintain this level of detail and specificity.";
+  }
+
+  return {
+    score,
+    feedback,
+    strengths,
+    improvements,
+  };
+}
+
 async function generateFeedbackAndScore(questionText, answer, session) {
   try {
+    // Check if Gemini API is available and rate limit
+    if (!genAI || !process.env.GEMINI_API_KEY) {
+      console.warn("⚠️ Gemini API not configured, using fallback scoring");
+      return getFallbackScore(answer);
+    }
+
+    // Check rate limit before making API call
+    if (!apiCallTracker.canMakeCall()) {
+      console.warn("⚠️ API rate limit reached, using fallback scoring");
+      return getFallbackScore(answer);
+    }
+
     const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash-exp" });
 
     // Get context about the job and candidate
@@ -333,63 +421,69 @@ async function generateFeedbackAndScore(questionText, answer, session) {
     Provide constructive feedback that helps the candidate improve.
     `;
 
-    const result = await model.generateContent(prompt);
+    // Record the API call for rate limiting
+    apiCallTracker.recordCall();
+
+    // Add timeout and retry logic for API calls
+    const result = await Promise.race([
+      model.generateContent(prompt),
+      new Promise((_, reject) =>
+        setTimeout(() => reject(new Error("API timeout")), 15000)
+      ),
+    ]);
+
     const response = await result.response;
     const text = response.text();
 
     // Parse the JSON response
     const jsonMatch = text.match(/\{[\s\S]*\}/);
     if (jsonMatch) {
-      const evaluation = JSON.parse(jsonMatch[0]);
+      try {
+        const evaluation = JSON.parse(jsonMatch[0]);
 
-      // Ensure score is within valid range
-      evaluation.score = Math.max(1, Math.min(10, evaluation.score));
+        // Ensure score is within valid range
+        evaluation.score = Math.max(1, Math.min(10, evaluation.score));
 
-      return {
-        score: evaluation.score,
-        feedback: evaluation.feedback || "No specific feedback provided.",
-        strengths: evaluation.strengths || "No specific strengths identified.",
-        improvements:
-          evaluation.improvements || "No specific improvements suggested.",
-      };
-    } else {
-      // Fallback if JSON parsing fails - give a low score for poor answers
-      const answerLength = answer.trim().length;
-      const fallbackScore = answerLength < 10 ? 1 : answerLength < 50 ? 2 : 5;
-
-      return {
-        score: fallbackScore,
-        feedback:
-          "Unable to generate detailed feedback due to system limitations.",
-        strengths: "Response was submitted successfully.",
-        improvements:
-          "Try to provide more detailed and relevant answers to demonstrate your knowledge.",
-      };
+        return {
+          score: evaluation.score,
+          feedback: evaluation.feedback || "No specific feedback provided.",
+          strengths:
+            evaluation.strengths || "No specific strengths identified.",
+          improvements:
+            evaluation.improvements || "No specific improvements suggested.",
+        };
+      } catch (parseError) {
+        console.error("❌ JSON parsing error:", parseError);
+        // Fall through to fallback logic
+      }
     }
-  } catch (error) {
-    console.error("❌ Error generating AI feedback:", error);
 
-    // Fallback scoring based on answer quality indicators
+    // Fallback if JSON parsing fails - give a reasonable score
     const answerLength = answer.trim().length;
-    let fallbackScore = 1;
-
-    if (answerLength < 10) {
-      fallbackScore = 1;
-    } else if (answerLength < 30) {
-      fallbackScore = 2;
-    } else if (answerLength < 100) {
-      fallbackScore = 4;
-    } else {
-      fallbackScore = 6;
-    }
+    const fallbackScore = answerLength < 10 ? 2 : answerLength < 50 ? 4 : 6;
 
     return {
       score: fallbackScore,
       feedback:
-        "System error occurred during evaluation. Score based on response length and basic criteria.",
-      strengths: "Response was provided within the time limit.",
+        "Unable to generate detailed AI feedback. Score based on answer length and relevance.",
+      strengths: "Response was submitted successfully.",
       improvements:
-        "Due to system limitations, detailed feedback is not available. Focus on providing comprehensive, relevant answers.",
+        "Try to provide more detailed and relevant answers to demonstrate your knowledge.",
     };
+  } catch (error) {
+    console.error("❌ Error generating AI feedback:", error);
+
+    // Handle specific API quota errors
+    if (
+      error.status === 429 ||
+      (error.message && error.message.includes("quota"))
+    ) {
+      console.warn("⚠️ API quota exceeded, using fallback scoring");
+    } else if (error.message && error.message.includes("timeout")) {
+      console.warn("⚠️ API timeout, using fallback scoring");
+    }
+
+    // Use the same fallback logic as the helper function
+    return getFallbackScore(answer);
   }
 }

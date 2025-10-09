@@ -77,6 +77,7 @@ const RecordAnswerSection: React.FC<RecordAnswerSectionProps> = ({
       toast("📋 New question loaded - ready for your answer", {
         icon: "🎯",
         duration: 2000,
+        id: `new-question-${sessionId}-${currentQuestion._id}`,
       });
     }
   }, [activeQuestionIndex, mockInterviewQuestion, currentQuestionId]);
@@ -94,12 +95,16 @@ const RecordAnswerSection: React.FC<RecordAnswerSectionProps> = ({
         // Stop the stream immediately as we just wanted to check permissions
         stream.getTracks().forEach((track) => track.stop());
         setCameraError(null);
-        toast.success("📹 Camera access granted successfully");
+        toast.success("📹 Camera access granted successfully", {
+          id: `camera-access-granted-${sessionId}`,
+        });
       } else {
         setCameraError("Camera not supported in this browser");
       }
     } catch (error: any) {
-      toast.error("❌ Camera permission error");
+      toast.error("❌ Camera permission error", {
+        id: `camera-permission-error-${sessionId}`,
+      });
       if (error.name === "NotAllowedError") {
         setCameraError(
           "Camera access denied. Please click 'Allow' when prompted for camera access, or check browser settings."
@@ -121,6 +126,64 @@ const RecordAnswerSection: React.FC<RecordAnswerSectionProps> = ({
     }
     setIsVideoOn(!isVideoOn);
   };
+
+  // Ensure react-webcam's internal stream is stopped when video is toggled off or component unmounts
+  useEffect(() => {
+    // When video is turned off, stop any tracks held by the webcam's video element
+    if (!isVideoOn) {
+      try {
+        const videoEl = webcamRef.current?.video as
+          | HTMLVideoElement
+          | undefined;
+        if (videoEl && videoEl.srcObject) {
+          const so = videoEl.srcObject as MediaStream;
+          so.getTracks().forEach((t) => {
+            try {
+              t.stop();
+            } catch (e) {
+              // ignore
+            }
+          });
+          try {
+            videoEl.srcObject = null;
+          } catch (e) {
+            // ignore
+          }
+          // webcam stream stopped on toggle off
+        }
+      } catch (e) {
+        // ignore
+      }
+    }
+  }, [isVideoOn]);
+
+  useEffect(() => {
+    return () => {
+      try {
+        const videoEl = webcamRef.current?.video as
+          | HTMLVideoElement
+          | undefined;
+        if (videoEl && videoEl.srcObject) {
+          const so = videoEl.srcObject as MediaStream;
+          so.getTracks().forEach((t) => {
+            try {
+              t.stop();
+            } catch (e) {
+              // ignore
+            }
+          });
+          try {
+            videoEl.srcObject = null;
+          } catch (e) {
+            // ignore
+          }
+          // webcam stream stopped on unmount
+        }
+      } catch (e) {
+        // ignore
+      }
+    };
+  }, []);
 
   const {
     error,
@@ -165,80 +228,63 @@ const RecordAnswerSection: React.FC<RecordAnswerSectionProps> = ({
     // Get current question from props
     const currentQuestion = mockInterviewQuestion[activeQuestionIndex];
     if (!currentQuestion) {
-      toast.error("❌ No question available");
+      toast.error("❌ No question available", {
+        id: `no-question-${sessionId}`,
+      });
       return;
     }
 
-    setLoading(true);
-    toast.loading("💭 Processing your answer...", { id: "answer-processing" });
-
+    // Optimistic update: notify parent & clear UI immediately to reduce perceived latency
     try {
-      const token = localStorage.getItem("authToken");
-      if (!token) {
-        toast.error("❌ Please login to save your answer", {
-          id: "answer-processing",
-        });
-        return;
-      }
-
-      const response = await fetch("/api/interview/answer", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          sessionId: sessionId,
+      if (onAnswerSubmitted) {
+        onAnswerSubmitted({
           questionId: currentQuestion._id,
           answer: userAnswer.trim(),
-        }),
-      });
-
-      const data = await response.json();
-
-      if (data.success) {
-        const fallbackMessage = data.data.fallbackMode
-          ? " (using temporary storage)"
-          : "";
-
-        toast.success(`✅ Answer saved successfully${fallbackMessage}`, {
-          id: "answer-processing",
-          duration: data.data.fallbackMode ? 4000 : 3000,
-        });
-
-        if (data.data.fallbackMode) {
-          toast(
-            "📝 Using temporary storage. Your answers are saved locally for this session.",
-            {
-              duration: 5000,
-              icon: "ℹ️",
-            }
-          );
-        }
-
-        // Notify parent component about the answer update
-        if (onAnswerSubmitted) {
-          onAnswerSubmitted({
-            questionId: currentQuestion._id,
-            answer: userAnswer.trim(),
-          });
-        }
-
-        // Clear the current answer after successful submission
-        setUserAnswer("");
-        setResults([]);
-      } else {
-        toast.error(`❌ ${data.error || "Failed to save answer"}`, {
-          id: "answer-processing",
         });
       }
-    } catch (error) {
-      toast.error("❌ Network error saving answer", {
-        id: "answer-processing",
-      });
-    } finally {
-      setLoading(false);
+      // Clear UI to indicate success
+      setUserAnswer("");
+      setResults([]);
+    } catch (e) {
+      console.error("Optimistic submit failed", e);
     }
+
+    // Fire-and-forget network request to persist the answer
+    (async () => {
+      try {
+        const token = localStorage.getItem("authToken");
+        if (!token) {
+          console.warn("No auth token for persisting answer");
+          return;
+        }
+
+        const response = await fetch("/api/interview/answer", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            sessionId: sessionId,
+            questionId: currentQuestion._id,
+            answer: userAnswer.trim(),
+          }),
+        });
+
+        const data = await response.json();
+        if (!data.success) {
+          console.warn("Server failed to persist answer", data);
+          toast.error("⚠️ Failed to persist answer to server", {
+            id: "answer-persist",
+          });
+        }
+      } catch (err) {
+        console.error("Network error persisting answer", err);
+        toast.error("⚠️ Network error persisting answer", {
+          id: "answer-persist",
+        });
+      }
+    })();
   };
 
   if (error)
@@ -278,7 +324,7 @@ const RecordAnswerSection: React.FC<RecordAnswerSectionProps> = ({
         </button>
       </div>
 
-      <div className="relative bg-black rounded-lg overflow-hidden mb-4 aspect-video">
+      {/* <div className="relative bg-black rounded-lg overflow-hidden mb-4 aspect-video">
         {cameraError ? (
           <div className="w-full h-full bg-red-900/20 flex items-center justify-center p-4">
             <div className="text-center">
@@ -300,7 +346,8 @@ const RecordAnswerSection: React.FC<RecordAnswerSectionProps> = ({
             className="w-full h-full object-cover"
             onUserMediaError={(error: any) => {
               toast.error(
-                "❌ Failed to access camera. Please check permissions."
+                "❌ Failed to access camera. Please check permissions.",
+                { id: `camera-usermedia-error-${sessionId}` }
               );
               setCameraError(
                 "Failed to access camera. Please check permissions."
@@ -317,7 +364,7 @@ const RecordAnswerSection: React.FC<RecordAnswerSectionProps> = ({
             )}
           </div>
         )}
-      </div>
+      </div> */}
 
       <div className="mb-4 min-h-20 p-3 bg-gray-50 rounded-lg border">
         {userAnswer ? (

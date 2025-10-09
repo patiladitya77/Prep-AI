@@ -22,6 +22,7 @@ model User {
   jobDescriptions   JD[]
   resumeAnalyses    ResumeAnalysis[]
   resumes           Resume[]
+  goals             Goal[]
 
   @@map("users")
 }
@@ -117,6 +118,29 @@ model Answer {
   session         InterviewSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
 
   @@map("answers")
+}
+
+model Goal {
+  id          String      @id @default(cuid())
+  userId      String      @map("user_id")
+  title       String
+  description String?
+  category    GoalCategory @default(INTERVIEW)
+  targetDate  DateTime    @map("target_date")
+  completed   Boolean     @default(false)
+  progress    Int         @default(0)
+  createdAt   DateTime    @default(now()) @map("created_at")
+  updatedAt   DateTime    @updatedAt @map("updated_at")
+  user        User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("goals")
+}
+
+enum GoalCategory {
+  INTERVIEW
+  LEARNING
+  PRACTICE
+  RESUME
 }
 
 enum InterviewSessionStatus {

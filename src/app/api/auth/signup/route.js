@@ -6,6 +6,7 @@ const {
   excludePassword,
   validateEmail,
   validatePassword,
+  validatePasswordDetailed,
   validateName,
 } = require("@/lib/auth/helpers");
 
@@ -27,11 +28,13 @@ async function POST(request) {
       );
     }
 
-    if (!validatePassword(password)) {
+    // Use detailed password validation and return structured errors the frontend expects
+    const pwdValidation = validatePasswordDetailed(password);
+    if (!pwdValidation.valid) {
       return NextResponse.json(
         {
           success: false,
-          message: "Password must be at least 6 characters long",
+          errors: pwdValidation.errors.map((msg) => ({ msg })),
         },
         { status: 400 }
       );

@@ -3,6 +3,7 @@ import { useState, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import toast from "react-hot-toast";
+import Loading, { ButtonLoading } from "@/components/ui/Loading";
 
 export default function ResetPassword() {
   const [password, setPassword] = useState("");
@@ -49,7 +50,7 @@ export default function ResetPassword() {
         resetToken.length === 64 &&
         process.env.NODE_ENV === "development"
       ) {
-        console.log("Database validation failed, using development fallback");
+        // Database validation failed in development, falling back to token format check
         setIsValidToken(true);
       }
     } catch (error) {
@@ -120,7 +121,7 @@ export default function ResetPassword() {
     return (
       <div className="flex items-center justify-center min-h-screen bg-gray-50">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+          <Loading size="large" color="blue" />
           <p className="mt-4 text-gray-600">Validating reset link...</p>
         </div>
       </div>

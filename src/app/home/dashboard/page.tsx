@@ -1,8 +1,9 @@
 ﻿"use client";
 import PreviousMockContainer from "@/components/dashboard/PreviousMockContainer";
 import { useRouter } from "next/navigation";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useAuth } from "@/context/AuthContext";
+import { PageLoading } from "@/components/ui/Loading";
 
 export default function Dashboard() {
   const router = useRouter();
@@ -15,11 +16,7 @@ export default function Dashboard() {
   }, [isAuthenticated, isLoading, router]);
 
   if (isLoading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-600"></div>
-      </div>
-    );
+    return <PageLoading text="Loading dashboard..." />;
   }
 
   if (!isAuthenticated) {
@@ -107,9 +104,17 @@ export default function Dashboard() {
         </button>
       </div>
 
-      <div className="rounded-md bg-white border border-gray-100 shadow-sm mx-2 my-5 p-3 w-3/4">
-        <h1 className="font-semibold">Tip of the day</h1>
-        <p>Keep your answers structured using STAR format</p>
+      <div className="rounded-md bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 shadow-sm mx-2 my-5 p-4 w-4/4">
+        <div className="flex items-center mb-3">
+          <h1 className="font-semibold text-blue-800">💡 Thought of the Day</h1>
+        </div>
+        <div className="bg-white rounded-lg p-4 border-l-4 border-blue-500">
+          <p className="text-gray-800 text-base font-medium italic">
+            "Success in interviews isn't about having perfect answers—it's about
+            showing your authentic self, demonstrating your growth mindset, and
+            connecting genuinely with the people you're meeting."
+          </p>
+        </div>
       </div>
 
       <div>

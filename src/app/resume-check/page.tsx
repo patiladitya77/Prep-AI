@@ -56,12 +56,12 @@ export default function ResumeCheckPage() {
 
   const handleFile = (file: File) => {
     if (file.type !== "application/pdf") {
-      toast.error("❌ Please upload a PDF file only");
+      toast.error(" Please upload a PDF file only");
       return;
     }
 
     if (file.size > 10 * 1024 * 1024) {
-      toast.error("❌ File size must be less than 10MB");
+      toast.error(" File size must be less than 10MB");
       return;
     }
 
@@ -71,7 +71,7 @@ export default function ResumeCheckPage() {
 
   const handleAnalyzeResume = async () => {
     if (!uploadedFile) {
-      toast.error("❌ Please upload a resume first");
+      toast.error(" Please upload a resume first");
       return;
     }
 
@@ -96,7 +96,7 @@ export default function ResumeCheckPage() {
 
       if (data.success) {
         setAnalysisResult(data.analysis);
-        toast.success("✅ Resume analysis completed!", { id: "analyzing" });
+        toast.success(" Resume analysis completed!", { id: "analyzing" });
       } else {
         toast.error("❌ " + (data.error || "Analysis failed"), {
           id: "analyzing",

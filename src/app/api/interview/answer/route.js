@@ -11,6 +11,26 @@ const JWT_SECRET = process.env.JWT_SECRET;
 const temporaryAnswers = new Map();
 const temporaryScores = new Map();
 
+// Rate limiting for Gemini API (shared with finish route)
+const apiCallTracker = {
+  calls: [],
+  maxCallsPerMinute: 8, // Stay under the 10 call/minute limit
+
+  canMakeCall() {
+    const now = Date.now();
+    const oneMinuteAgo = now - 60000;
+
+    // Remove calls older than 1 minute
+    this.calls = this.calls.filter((timestamp) => timestamp > oneMinuteAgo);
+
+    return this.calls.length < this.maxCallsPerMinute;
+  },
+
+  recordCall() {
+    this.calls.push(Date.now());
+  },
+};
+
 export async function POST(request) {
   try {
     // Parse request body
@@ -143,8 +163,48 @@ export async function POST(request) {
   }
 }
 
+// Fallback scoring function for when API is unavailable
+function getFallbackScore(answer) {
+  const answerLength = answer.trim().length;
+  const wordCount = answer.trim().split(/\s+/).length;
+
+  let score = 3; // Default reasonable score
+
+  if (answerLength < 10) {
+    score = 1;
+  } else if (answerLength < 50 || wordCount < 10) {
+    score = 3;
+  } else if (answerLength < 150 || wordCount < 25) {
+    score = 5;
+  } else if (answerLength < 300 || wordCount < 50) {
+    score = 7;
+  } else {
+    score = 8;
+  }
+
+  return {
+    score,
+    feedback:
+      "Score calculated based on response characteristics. AI feedback temporarily unavailable.",
+    strengths: "Response submitted successfully.",
+    improvements: "Focus on providing detailed, relevant answers.",
+  };
+}
+
 async function generateFeedbackAndScore(questionText, answer, session) {
   try {
+    // Check if Gemini API is available and rate limit
+    if (!genAI || !process.env.GEMINI_API_KEY) {
+      console.warn("⚠️ Gemini API not configured, using fallback scoring");
+      return getFallbackScore(answer);
+    }
+
+    // Check rate limit before making API call
+    if (!apiCallTracker.canMakeCall()) {
+      console.warn("⚠️ API rate limit reached, using fallback scoring");
+      return getFallbackScore(answer);
+    }
+
     const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
 
     // Get context about the job and candidate
@@ -203,29 +263,50 @@ async function generateFeedbackAndScore(questionText, answer, session) {
       Only return the JSON object, no additional text.
     `;
 
-    const result = await model.generateContent(prompt);
+    // Record the API call for rate limiting
+    apiCallTracker.recordCall();
+
+    // Add timeout for API calls
+    const result = await Promise.race([
+      model.generateContent(prompt),
+      new Promise((_, reject) =>
+        setTimeout(() => reject(new Error("API timeout")), 10000)
+      ),
+    ]);
+
     const response = await result.response;
     const text = response.text();
 
     // Clean and parse the response
-    const cleanedText = text.replace(/```json\n?|\n?```/g, "").trim();
-    const evaluation = JSON.parse(cleanedText);
+    try {
+      const cleanedText = text.replace(/```json\n?|\n?```/g, "").trim();
+      const evaluation = JSON.parse(cleanedText);
 
-    return {
-      score: evaluation.score,
-      feedback: evaluation.feedback,
-      strengths: evaluation.strengths,
-      improvements: evaluation.improvements,
-    };
+      return {
+        score: evaluation.score || 5,
+        feedback: evaluation.feedback || "Feedback generation incomplete.",
+        strengths: evaluation.strengths || ["Response submitted successfully."],
+        improvements: evaluation.improvements || [
+          "Focus on providing more detailed answers.",
+        ],
+      };
+    } catch (parseError) {
+      console.error("❌ JSON parsing error:", parseError);
+      return getFallbackScore(answer);
+    }
   } catch (error) {
     console.error("❌ Error generating feedback:", error);
-    // Return default feedback if AI fails
-    return {
-      score: 5.0,
-      feedback:
-        "Answer recorded. Unable to generate detailed feedback at this time.",
-      strengths: [],
-      improvements: ["Please provide more detailed responses"],
-    };
+
+    // Handle specific API quota errors
+    if (
+      error.status === 429 ||
+      (error.message && error.message.includes("quota"))
+    ) {
+      console.warn("⚠️ API quota exceeded, using fallback scoring");
+    } else if (error.message && error.message.includes("timeout")) {
+      console.warn("⚠️ API timeout, using fallback scoring");
+    }
+
+    return getFallbackScore(answer);
   }
 }

@@ -3,6 +3,7 @@ import { useRouter } from "next/navigation";
 import React, { useState, useEffect } from "react";
 import toast from "react-hot-toast";
 import { useAuth } from "@/context/AuthContext";
+import { PageLoading, ButtonLoading } from "@/components/ui/Loading";
 
 export default function Login() {
   const [email, setEmail] = useState("");
@@ -40,12 +41,12 @@ export default function Login() {
         // Update AuthContext with login data
         login(data.data.token, data.data.user);
 
-        toast.success("✅ Login successful! Welcome back!", {
+        toast.success(" Login successful! Welcome back!", {
           id: "login-progress",
         });
         router.push("/home/dashboard");
       } else {
-        toast.error(data.message || "❌ Login failed. Please try again.", {
+        toast.error(data.message || " Login failed. Please try again.", {
           id: "login-progress",
         });
         setErrorMessage(data.message || "Login failed. Please try again.");
@@ -65,11 +66,7 @@ export default function Login() {
 
   // Show loading while checking auth status
   if (authLoading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen bg-white bg-opacity-20">
-        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-black"></div>
-      </div>
-    );
+    return <PageLoading text="Checking authentication..." />;
   }
 
   // Don't render login form if already authenticated
@@ -139,12 +136,23 @@ export default function Login() {
               }`}
               suppressHydrationWarning
             >
-              {isLoading ? "Logging in..." : "Login"}
+              {isLoading ? (
+                <div className="flex items-center justify-center space-x-2">
+                  <ButtonLoading />
+                  <span>Logging in...</span>
+                </div>
+              ) : (
+                "Login"
+              )}
             </button>
             <button
               type="button"
               disabled={isLoading}
-              className="w-full p-2 border rounded-lg hover:bg-gray-100 disabled:opacity-50"
+              onClick={() => {
+                // Redirect to server endpoint that starts Google OAuth
+                window.location.href = "/api/auth/google";
+              }}
+              className="w-full p-2 border rounded-lg hover:bg-gray-100 disabled:opacity-50 cursor-pointer"
               suppressHydrationWarning
             >
               Continue with Google

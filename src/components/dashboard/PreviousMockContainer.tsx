@@ -1,8 +1,15 @@
 "use client";
-import React, { use, useEffect, useState } from "react";
+import React, { use, useEffect, useState, useRef } from "react";
 import PreviousInterviewCard from "./PreviousInterviewCard";
 import toast from "react-hot-toast";
 import { useRouter } from "next/navigation";
+import Loading from "../ui/Loading";
+import {
+  getCachedInterviews,
+  cacheInterviews,
+  invalidateInterviewCache,
+  isCacheValid,
+} from "@/utils/interviewCache";
 
 interface Interview {
   id: string;
@@ -21,16 +28,41 @@ const PreviousMockContainer = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const router = useRouter();
+  // prevent duplicate reattempt submissions per interview id
+  const reattemptingRef = useRef<Record<string, boolean>>({});
 
   useEffect(() => {
-    fetchCompletedInterviews();
+    loadInterviews();
   }, []);
+
+  // Load interviews from cache or fetch fresh data
+  const loadInterviews = async () => {
+    try {
+      // Try to load from cache first
+      const cachedInterviews = getCachedInterviews();
+
+      if (cachedInterviews && isCacheValid()) {
+        // Use cached data
+        setInterviews(cachedInterviews);
+        setLoading(false);
+        return;
+      }
+
+      // Fetch fresh data
+      await fetchCompletedInterviews();
+    } catch (error) {
+      console.error("Error loading interviews:", error);
+      // If cache loading fails, fetch fresh data
+      await fetchCompletedInterviews();
+    }
+  };
 
   const fetchCompletedInterviews = async () => {
     try {
       const token = localStorage.getItem("authToken");
       if (!token) {
         setError("Please login to view your interview history");
+        setLoading(false);
         return;
       }
 
@@ -45,30 +77,57 @@ const PreviousMockContainer = () => {
       const data = await response.json();
 
       if (data.success) {
-        setInterviews(data.data.interviews);
+        const fetchedInterviews = data.data.interviews;
+        setInterviews(fetchedInterviews);
+
+        // Cache the data using utility function
+        cacheInterviews(fetchedInterviews);
       } else {
         setError(data.error || "Failed to fetch interview history");
-        toast.error("❌ Failed to load interview history");
+        toast.error(" Failed to load interview history");
       }
     } catch (error) {
       setError("Network error loading interviews");
-      toast.error("❌ Network error loading interview history");
+      toast.error(" Network error loading interview history");
     } finally {
       setLoading(false);
     }
   };
 
+  // Method to refresh interviews (can be called externally)
+  const refreshInterviews = async () => {
+    setLoading(true);
+    setError(null);
+    // Clear cache to force fresh fetch
+    invalidateInterviewCache();
+    await fetchCompletedInterviews();
+  };
+
+  // Expose refresh method globally for other components to use
+  useEffect(() => {
+    // Store refresh function globally so other components can trigger refresh
+    (window as any).refreshInterviewHistory = refreshInterviews;
+
+    return () => {
+      // Cleanup
+      delete (window as any).refreshInterviewHistory;
+    };
+  }, []);
+
   const handleReAttempt = async (interviewId: string) => {
     try {
+      if (reattemptingRef.current[interviewId]) return;
+      reattemptingRef.current[interviewId] = true;
       const token = localStorage.getItem("authToken");
       if (!token) {
-        toast.error("❌ Please login to re-attempt interview");
+        toast.error(" Please login to re-attempt interview");
         return;
       }
 
-      // Show loading toast
-      const loadingToast = toast.loading(
-        "🔄 Creating new interview session..."
+      // Show loading toast while creating a new session
+      const loadingToastId = toast.loading(
+        "Creating new interview session...",
+        { id: `reattempt-loading-${interviewId}` }
       );
 
       const response = await fetch("/api/interview/reattempt", {
@@ -84,18 +143,38 @@ const PreviousMockContainer = () => {
 
       const data = await response.json();
 
-      toast.dismiss(loadingToast);
+      // Dismiss loading toast
+      toast.dismiss(loadingToastId);
 
       if (data.success) {
-        toast.success("🎯 New interview session created! Redirecting...");
+        // Invalidate interview cache since a new interview session was created
+        invalidateInterviewCache();
+
+        toast.success("🎯 New interview session created! Redirecting...", {
+          id: `reattempt-success-${interviewId}`,
+        });
         // Redirect to the new interview session with active parameter
+        console.debug(
+          "PreviousMockContainer: navigating to interview reattempt",
+          data.sessionId
+        );
         router.push(`/interview/${data.sessionId}?session=active`);
+        // leave the flag true briefly; clear after a tick
+        setTimeout(() => {
+          delete reattemptingRef.current[interviewId];
+        }, 3000);
       } else {
-        toast.error(`❌ ${data.error || "Failed to re-attempt interview"}`);
+        toast.error(` ${data.error || "Failed to re-attempt interview"}`, {
+          id: `reattempt-error-${interviewId}`,
+        });
+        delete reattemptingRef.current[interviewId];
       }
     } catch (error) {
       console.error("Error re-attempting interview:", error);
-      toast.error("❌ Network error. Please try again.");
+      toast.error("Network error. Please try again.", {
+        id: `reattempt-error-${interviewId}`,
+      });
+      delete reattemptingRef.current[interviewId];
     }
   };
 
@@ -106,7 +185,7 @@ const PreviousMockContainer = () => {
           Previous Mock Interviews
         </h1>
         <div className="p-4 text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
+          <Loading size="medium" color="blue" />
           <p className="text-gray-500 mt-2">
             Loading your interview history...
           </p>
@@ -130,14 +209,24 @@ const PreviousMockContainer = () => {
 
   return (
     <div className="bg-white rounded-md w-full border border-gray-100 shadow-sm">
-      <h1 className="font-semibold text-xl p-2 m-2">
-        Previous Mock Interviews
-        {interviews.length > 0 && (
-          <span className="text-sm text-gray-500 ml-2">
-            ({interviews.length} completed)
-          </span>
-        )}
-      </h1>
+      <div className="flex justify-between items-center p-2 m-2">
+        <h1 className="font-semibold text-xl">
+          Previous Mock Interviews
+          {interviews.length > 0 && (
+            <span className="text-sm text-gray-500 ml-2">
+              ({interviews.length} completed)
+            </span>
+          )}
+        </h1>
+        <button
+          onClick={refreshInterviews}
+          disabled={loading}
+          className="px-3 py-1 text-sm bg-blue-50 hover:bg-blue-100 text-blue-600 rounded-md border border-blue-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          title="Refresh interview history"
+        >
+          {loading ? "Refreshing..." : "🔄 Refresh"}
+        </button>
+      </div>
 
       {interviews.length === 0 ? (
         <div className="p-4 text-center text-gray-500">
@@ -157,6 +246,10 @@ const PreviousMockContainer = () => {
               }}
               onViewFeedback={() => {
                 // Navigate to feedback page or open modal
+                console.debug(
+                  "PreviousMockContainer: navigating to results",
+                  interview.id
+                );
                 router.push(`/interview/${interview.id}/results`);
               }}
             />

@@ -2,6 +2,7 @@
 import { useRouter } from "next/navigation";
 import React, { useState } from "react";
 import toast from "react-hot-toast";
+import { ButtonLoading } from "@/components/ui/Loading";
 
 export default function SignUp() {
   const [name, setName] = useState("");
@@ -33,9 +34,7 @@ export default function SignUp() {
         localStorage.setItem("authToken", data.data.token);
         localStorage.setItem("user", JSON.stringify(data.data.user));
 
-        toast.success("✅ Account created successfully! Welcome!", {
-          id: "signup-progress",
-        });
+        toast.success("Account created successfully!");
         router.push("/home/dashboard");
       } else {
         const errorMsg =
@@ -43,12 +42,12 @@ export default function SignUp() {
             ? data.errors.map((err: any) => err.msg).join(", ")
             : data.message || "Signup failed. Please try again.";
 
-        toast.error(`❌ ${errorMsg}`, { id: "signup-progress" });
+        toast.error(` ${errorMsg}`, { id: "signup-progress" });
         setErrorMessage(errorMsg);
       }
     } catch (error) {
       toast.error(
-        "❌ Network error. Please check your connection and try again.",
+        " Network error. Please check your connection and try again.",
         { id: "signup-progress" }
       );
       setErrorMessage(
@@ -124,19 +123,30 @@ export default function SignUp() {
             <button
               type="submit"
               disabled={isLoading}
-              className={`w-full p-2 rounded-lg text-white font-medium ${
+              className={`w-full p-2 rounded-lg text-white font-medium cursor-pointer ${
                 isLoading
                   ? "bg-gray-400 cursor-not-allowed"
                   : "bg-black hover:bg-gray-800"
               }`}
               suppressHydrationWarning
             >
-              {isLoading ? "Creating Account..." : "Sign Up"}
+              {isLoading ? (
+                <div className="flex items-center justify-center space-x-2">
+                  <ButtonLoading />
+                  <span>Creating account...</span>
+                </div>
+              ) : (
+                "Create account"
+              )}
             </button>
             <button
               type="button"
               disabled={isLoading}
-              className="w-full p-2 border rounded-lg hover:bg-gray-100 disabled:opacity-50"
+              onClick={() => {
+                // Redirect to server endpoint that starts Google OAuth
+                window.location.href = "/api/auth/google";
+              }}
+              className="w-full p-2 border rounded-lg hover:bg-gray-100 disabled:opacity-50 cursor-pointer"
               suppressHydrationWarning
             >
               Continue with Google

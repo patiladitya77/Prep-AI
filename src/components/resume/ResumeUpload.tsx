@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { Button } from "../ui/button";
 import { Card } from "../ui/card";
 import toast from "react-hot-toast";
+import { ButtonLoading, InlineLoading } from "../ui/Loading";
 
 interface ResumeUploadProps {
   onResumeUploaded: (resumeData: any) => void;
@@ -36,7 +37,7 @@ const ResumeUpload: React.FC<ResumeUploadProps> = ({
     setUploadError(null);
     setUploadSuccess(null);
     setUploadStage("Uploading resume...");
-    toast.loading("📤 Starting resume upload...", { id: "upload-progress" });
+    toast.loading("📂 Starting resume upload...", { id: "upload-progress" });
 
     try {
       const token = localStorage.getItem("authToken");
@@ -87,7 +88,7 @@ const ResumeUpload: React.FC<ResumeUploadProps> = ({
           );
           setUploadStage("");
           toast.success(
-            `✅ Resume uploaded successfully! Extracted ${
+            ` Resume uploaded successfully! Extracted ${
               data.resume.parsedData?.skills?.length || 0
             } skills`,
             { id: "upload-progress" }
@@ -104,7 +105,7 @@ const ResumeUpload: React.FC<ResumeUploadProps> = ({
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : "Upload failed";
-      toast.error(`❌ ${errorMessage}`, { id: "upload-progress" });
+      toast.error(` ${errorMessage}`, { id: "upload-progress" });
       setUploadError(errorMessage);
       setUploadStage("");
 
@@ -218,8 +219,8 @@ const ResumeUpload: React.FC<ResumeUploadProps> = ({
           {uploading ? (
             <div className="py-4">
               <div className="flex items-center justify-center mb-4">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mr-3"></div>
-                <div className="text-left">
+                <InlineLoading />
+                <div className="text-left ml-3">
                   <p className="text-blue-600 font-medium">Processing Resume</p>
                   <p className="text-sm text-gray-600">{uploadStage}</p>
                 </div>
