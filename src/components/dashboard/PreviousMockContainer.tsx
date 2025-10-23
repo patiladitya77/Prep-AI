@@ -99,7 +99,9 @@ const PreviousMockContainer = () => {
     setLoading(true);
     setError(null);
     // Clear cache to force fresh fetch
-    invalidateInterviewCache();
+    // We're the initiator of this refresh; avoid triggering the global
+    // refresh callback to prevent an immediate recursive call back here.
+    invalidateInterviewCache(false);
     await fetchCompletedInterviews();
   };
 
@@ -148,7 +150,9 @@ const PreviousMockContainer = () => {
 
       if (data.success) {
         // Invalidate interview cache since a new interview session was created
-        invalidateInterviewCache();
+        // We triggered the reattempt here; avoid causing a recursive refresh
+        // by not invoking the global refresh callback.
+        invalidateInterviewCache(false);
 
         toast.success("🎯 New interview session created! Redirecting...", {
           id: `reattempt-success-${interviewId}`,

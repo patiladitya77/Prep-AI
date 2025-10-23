@@ -104,6 +104,8 @@ const InterviewUI: React.FC<InterviewUIProps> = ({ sessionId }) => {
           duration: 5000,
           id: `final-warning-${sessionId}`,
         });
+        // record last warning
+        lastWarningRef.current = { type, count, timestamp: now };
       } else {
         toast.error(
           `Warning ${count}/${MONITOR_MAX_WARNINGS}: Please follow interview guidelines.`,
@@ -112,6 +114,8 @@ const InterviewUI: React.FC<InterviewUIProps> = ({ sessionId }) => {
             id: `warning-${sessionId}-${type}-${count}`,
           }
         );
+        // record last warning
+        lastWarningRef.current = { type, count, timestamp: now };
       }
     },
     onInterviewTerminated: () => {
@@ -577,7 +581,9 @@ const InterviewUI: React.FC<InterviewUIProps> = ({ sessionId }) => {
         setShowResults(true);
 
         // Invalidate interview cache since a new interview was completed
-        invalidateInterviewCache();
+        // We're the originator of this change — avoid triggering a global
+        // refresh callback which could call back into this component.
+        invalidateInterviewCache(false);
 
         toast.success(
           `🎯 Interview completed! Final score: ${data.data.overallScore}/10 (${data.data.grade})`,
@@ -743,6 +749,29 @@ const InterviewUI: React.FC<InterviewUIProps> = ({ sessionId }) => {
 
   return (
     <div className="max-w-7xl mx-auto p-4 md:p-8">
+      {/* Debug overlay (development only) */}
+      {process.env.NODE_ENV === "development" && (
+        <div className="fixed top-4 right-4 z-50 bg-white/95 border rounded-md p-2 text-xs text-gray-800 shadow">
+          <div>
+            <strong>FaceCount:</strong> {detectionStatus?.faceCount ?? 0}
+          </div>
+          <div>
+            <strong>Face:</strong>{" "}
+            {detectionStatus?.faceDetected ? "yes" : "no"}
+          </div>
+          <div>
+            <strong>Eyes:</strong>{" "}
+            {detectionStatus?.eyesDetected ? "open" : "closed"}
+          </div>
+          <div>
+            <strong>Looking:</strong>{" "}
+            {detectionStatus?.lookingAtCamera ? "yes" : "no"}
+          </div>
+          <div>
+            <strong>Stream:</strong> {hasStream ? "ok" : "no"}
+          </div>
+        </div>
+      )}
       {/* Monitoring is now integrated into the camera view */}
 
       {/* Fallback Mode Banner */}

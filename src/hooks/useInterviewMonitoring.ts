@@ -2,7 +2,10 @@ import { useEffect, useRef, useState, useCallback } from "react";
 import toast from "react-hot-toast";
 
 interface MonitoringOptions {
-  onWarning: (type: "tab-switch" | "camera-look-away", count: number) => void;
+  onWarning: (
+    type: "tab-switch" | "camera-look-away" | "multiple-faces",
+    count: number
+  ) => void;
   onInterviewTerminated: () => void;
   // maximum number of warnings before termination
   maxWarnings?: number;
@@ -27,6 +30,7 @@ export const useInterviewMonitoring = ({
     faceDetected: false,
     eyesDetected: false,
     lookingAtCamera: false,
+    faceCount: 0,
   });
 
   // Refs for camera and detection
@@ -39,7 +43,12 @@ export const useInterviewMonitoring = ({
   // Small smoothing counter to avoid rapid flicker between looking/away
   const lookAtConfidenceRef = useRef<number>(0);
   const lookAwayTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const lastToastRef = useRef<string>(""); // Track last toast to prevent duplicates
+  const multipleFacesTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  // Track last toast times per warning type to prevent duplicate toasts of the same
+  // type while allowing different warning types to be shown independently.
+  const lastToastMapRef = useRef<Record<string, number>>({});
+  const lastResultTimeRef = useRef<number | null>(null);
+  const noResultsWarnedRef = useRef<boolean>(false);
   const tabSwitchTimeRef = useRef<number>(Date.now());
   const isTabAwayRef = useRef<boolean>(false);
   // Track start time of a continuous look-away (long-duration)
@@ -89,15 +98,17 @@ export const useInterviewMonitoring = ({
   }, []);
 
   const addWarning = useCallback(
-    (type: "tab-switch" | "camera-look-away") => {
-      // Prevent duplicate warnings for same type within short time
+    (type: "tab-switch" | "camera-look-away" | "multiple-faces") => {
+      // Prevent duplicate warnings of the same type within a short window
       const now = Date.now();
-      const lastToastTime = lastToastRef.current;
-      if (lastToastTime && now - parseInt(lastToastTime) < 3000) {
-        return; // Skip if same warning was shown in last 3 seconds
+      const last = lastToastMapRef.current[type];
+      if (last && now - last < 3000) {
+        return; // Skip if this same warning type was shown in the last 3 seconds
       }
 
-      lastToastRef.current = now.toString();
+      // Record this warning's timestamp keyed by its type so other warning types
+      // (e.g. tab-switch) don't suppress a multiple-faces warning.
+      lastToastMapRef.current[type] = now;
 
       setWarningCount((currentCount) => {
         const newCount = currentCount + 1;
@@ -255,7 +266,8 @@ export const useInterviewMonitoring = ({
       });
 
       faceMesh.setOptions({
-        maxNumFaces: 1,
+        // Allow multiple faces so we can detect if >1 person in frame
+        maxNumFaces: 4,
         refineLandmarks: true,
         minDetectionConfidence: 0.5,
         minTrackingConfidence: 0.5,
@@ -264,6 +276,9 @@ export const useInterviewMonitoring = ({
       // console.log("⚙️ Setting up FaceMesh configuration...");
 
       faceMesh.onResults((results: any) => {
+        // update last result timestamp
+        lastResultTimeRef.current = Date.now();
+        noResultsWarnedRef.current = false;
         // Debug first few results
         if (Math.random() < 0.02) {
           // 2% of the time - debug output suppressed
@@ -285,6 +300,7 @@ export const useInterviewMonitoring = ({
           results.multiFaceLandmarks &&
           results.multiFaceLandmarks.length > 0
         ) {
+          const faceCount = results.multiFaceLandmarks.length;
           const landmarks = results.multiFaceLandmarks[0];
 
           // Face detection
@@ -353,12 +369,43 @@ export const useInterviewMonitoring = ({
 
           const lookingAtCamera = lookAtConfidenceRef.current >= 2;
 
-          // Update detection status
+          // Update detection status (include faceCount)
           setDetectionStatus({
             faceDetected,
             eyesDetected,
             lookingAtCamera,
+            faceCount,
           });
+
+          // Multiple faces detection: warn if more than one face is present
+          try {
+            if (faceCount > 1) {
+              // Multiple faces detected. We warn immediately (with a cooldown)
+              // so the user is notified even during calibration. A 10s cooldown
+              // prevents repeated spam while the condition persists.
+              try {
+                console.debug(
+                  "useInterviewMonitoring: multiple faces detected",
+                  { faceCount }
+                );
+              } catch (e) {}
+              if (!multipleFacesTimeoutRef.current) {
+                addWarning("multiple-faces");
+                multipleFacesTimeoutRef.current = setTimeout(() => {
+                  multipleFacesTimeoutRef.current = null;
+                }, 10000);
+              }
+            } else {
+              // When faceCount returns to 1 or 0, clear any cooldown so future
+              // multiple-face events can be detected again.
+              if (multipleFacesTimeoutRef.current) {
+                clearTimeout(multipleFacesTimeoutRef.current);
+                multipleFacesTimeoutRef.current = null;
+              }
+            }
+          } catch (err) {
+            console.error("Multiple-faces detection check failed", err);
+          }
 
           // Debug logging
           if (Math.random() < 0.05) {
@@ -444,7 +491,13 @@ export const useInterviewMonitoring = ({
             faceDetected: false,
             eyesDetected: false,
             lookingAtCamera: false,
+            faceCount: 0,
           });
+
+          if (multipleFacesTimeoutRef.current) {
+            clearTimeout(multipleFacesTimeoutRef.current);
+            multipleFacesTimeoutRef.current = null;
+          }
 
           if (!lookAwayTimeoutRef.current && !isCalibrating) {
             lookAwayTimeoutRef.current = setTimeout(() => {
@@ -509,7 +562,7 @@ export const useInterviewMonitoring = ({
           });
 
           faceMesh.setOptions({
-            maxNumFaces: 1,
+            maxNumFaces: 4,
             refineLandmarks: true,
             minDetectionConfidence: 0.5,
             minTrackingConfidence: 0.5,
@@ -517,6 +570,9 @@ export const useInterviewMonitoring = ({
 
           // Set up the same onResults handler
           faceMesh.onResults((results: any) => {
+            // update last result timestamp
+            lastResultTimeRef.current = Date.now();
+            noResultsWarnedRef.current = false;
             // Same detection logic as before
             if (
               results.multiFaceLandmarks &&
@@ -528,12 +584,14 @@ export const useInterviewMonitoring = ({
                 faceDetected,
                 eyesDetected: faceDetected,
                 lookingAtCamera: faceDetected,
+                faceCount: 1,
               });
             } else {
               setDetectionStatus({
                 faceDetected: false,
                 eyesDetected: false,
                 lookingAtCamera: false,
+                faceCount: 0,
               });
             }
           });
@@ -560,6 +618,7 @@ export const useInterviewMonitoring = ({
             faceDetected: true,
             eyesDetected: true,
             lookingAtCamera: true,
+            faceCount: 1,
           });
         },
         close: () => {},
@@ -1103,6 +1162,46 @@ export const useInterviewMonitoring = ({
         }
 
         // console.log("📹 MediaPipe camera monitoring started successfully");
+        // Start a watchdog to detect if FaceMesh isn't producing results
+        const watchdogInterval = setInterval(() => {
+          try {
+            const last = lastResultTimeRef.current;
+            if (!last) {
+              // no results yet: warn after initial 5s (but only once)
+              if (
+                !noResultsWarnedRef.current &&
+                Date.now() - (streamRef.current ? Date.now() : 0) > 5000
+              ) {
+                noResultsWarnedRef.current = true;
+                toast.error(
+                  "Face detection not producing results. Please check camera/permissions.",
+                  { id: "face-results-watchdog" }
+                );
+              }
+              return;
+            }
+            if (Date.now() - last > 5000) {
+              if (!noResultsWarnedRef.current) {
+                noResultsWarnedRef.current = true;
+                toast.error(
+                  "Face detection inactive — make sure camera view is clear.",
+                  { id: "face-results-inactive" }
+                );
+              }
+            }
+          } catch (e) {
+            // ignore watchdog errors
+          }
+        }, 2000);
+
+        // Store cleanup so it can be cleared on stopCameraMonitoring
+        const oldUnload = unloadCleanupRef.current;
+        unloadCleanupRef.current = () => {
+          try {
+            clearInterval(watchdogInterval);
+          } catch (e) {}
+          if (oldUnload) oldUnload();
+        };
       } else {
         console.error("❌ Video element or MediaPipe not ready");
         setHasStream(false);
@@ -1233,6 +1332,7 @@ export const useInterviewMonitoring = ({
           faceDetected: false,
           eyesDetected: false,
           lookingAtCamera: false,
+          faceCount: 0,
         };
       });
     } catch (e) {

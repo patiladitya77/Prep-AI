@@ -52,16 +52,23 @@ export async function GET(request) {
     const processedInterviews = completedInterviews.map((session) => {
       const totalQuestions = session._count.questions;
       const totalAnswers = session._count.answers;
-      const completionPercentage = totalQuestions > 0 ? Math.round((totalAnswers / totalQuestions) * 100) : 0;
+      const completionPercentage =
+        totalQuestions > 0
+          ? Math.round((totalAnswers / totalQuestions) * 100)
+          : 0;
 
       // Calculate overall score from answers
       const answersWithScores = session.questions
-        .flatMap(q => q.answers)
-        .filter(answer => answer.score !== null);
-      
-      const overallScore = answersWithScores.length > 0
-        ? answersWithScores.reduce((sum, answer) => sum + (answer.score || 0), 0) / answersWithScores.length
-        : 0;
+        .flatMap((q) => q.answers)
+        .filter((answer) => answer.score !== null);
+
+      const overallScore =
+        answersWithScores.length > 0
+          ? answersWithScores.reduce(
+              (sum, answer) => sum + (answer.score || 0),
+              0
+            ) / answersWithScores.length
+          : 0;
 
       // Determine grade
       let grade = "Not Graded";
@@ -74,8 +81,14 @@ export async function GET(request) {
 
       return {
         id: session.id,
-        jobRole: session.jd?.parsedData?.title || session.jd?.parsedData?.jobRole || "Unknown Position",
-        experienceLevel: session.jd?.parsedData?.expReq || session.jd?.parsedData?.experienceLevel || "0",
+        jobRole:
+          session.jd?.parsedData?.title ||
+          session.jd?.parsedData?.jobRole ||
+          "Unknown Position",
+        experienceLevel:
+          session.jd?.parsedData?.expReq ||
+          session.jd?.parsedData?.experienceLevel ||
+          "0",
         createdAt: session.endedAt || session.startedAt || session.createdAt,
         updatedAt: session.updatedAt,
         overallScore: parseFloat(overallScore.toFixed(1)),
@@ -94,7 +107,6 @@ export async function GET(request) {
         totalCompleted: processedInterviews.length,
       },
     });
-
   } catch (error) {
     console.error("❌ Error fetching completed interviews:", error);
     return NextResponse.json(
@@ -102,6 +114,6 @@ export async function GET(request) {
       { status: 500 }
     );
   } finally {
-    await prisma.$disconnect();
+    // keep Prisma client alive across requests in dev/server mode
   }
 }

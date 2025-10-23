@@ -359,6 +359,6 @@ Please ensure all scores are realistic and constructive. Provide specific, actio
       { status: 500 }
     );
   } finally {
-    await prisma.$disconnect();
+    // keep Prisma client alive across requests in dev/server mode
   }
 }

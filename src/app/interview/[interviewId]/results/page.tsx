@@ -125,7 +125,9 @@ export default function InterviewResultsPage() {
 
       if (data.success) {
         // Invalidate interview cache since a new interview session was created
-        invalidateInterviewCache();
+        // We're the originator here — avoid triggering the global refresh callback
+        // which may call back into this component and create a loop.
+        invalidateInterviewCache(false);
 
         toast.success("🎯 New interview session created! Redirecting...");
         // Redirect to the new interview session with active parameter
