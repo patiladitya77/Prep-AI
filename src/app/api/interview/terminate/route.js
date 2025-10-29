@@ -77,12 +77,28 @@ async function POST(request) {
     });
   } catch (error) {
     console.error("Error terminating interview session:", error);
+
+    // If Prisma engine returned an error with additional metadata, include
+    // small, non-sensitive details to aid debugging in dev.
+    const isPrismaErr = error && error.name && error.name.startsWith("Prisma");
+    if (isPrismaErr) {
+      const safeDetails = {
+        name: error.name,
+        message: error.message,
+      };
+      if (process.env.NODE_ENV === "development") {
+        safeDetails.stack = error.stack;
+      }
+      return NextResponse.json(
+        { error: "Prisma error", details: safeDetails },
+        { status: 500 }
+      );
+    }
+
     return NextResponse.json(
       { error: "Failed to terminate interview session" },
       { status: 500 }
     );
-  } finally {
-    await prisma.$disconnect();
   }
 }
 

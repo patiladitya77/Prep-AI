@@ -8,13 +8,15 @@ export const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
  * Invalidate the interview cache
  * This should be called when interview history changes (new interview completed, etc.)
  */
-export const invalidateInterviewCache = () => {
+export const invalidateInterviewCache = (triggerRefresh = true) => {
   if (typeof window !== "undefined") {
     localStorage.removeItem(INTERVIEW_CACHE_KEY);
     localStorage.removeItem(INTERVIEW_CACHE_TIMESTAMP_KEY);
 
-    // Also trigger refresh of dashboard if it's currently loaded
-    if ((window as any).refreshInterviewHistory) {
+    // Optionally trigger refresh of dashboard if it's currently loaded
+    // When invalidation is initiated by the dashboard itself (e.g. user pressed
+    // refresh), passing triggerRefresh=false prevents a recursive loop.
+    if (triggerRefresh && (window as any).refreshInterviewHistory) {
       (window as any).refreshInterviewHistory();
     }
   }

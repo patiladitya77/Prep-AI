@@ -80,6 +80,6 @@ export async function GET(request, { params }) {
       { status: 500 }
     );
   } finally {
-    await prisma.$disconnect();
+    // keep Prisma client alive across requests in dev/server mode
   }
 }

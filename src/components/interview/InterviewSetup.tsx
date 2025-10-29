@@ -160,7 +160,8 @@ const InterviewSetup: React.FC<InterviewSetupProps> = ({ interviewId }) => {
       const data = await response.json();
       if (data.success) {
         // Invalidate interview cache since a new interview was created
-        invalidateInterviewCache();
+        // We're the originator — avoid triggering a global refresh callback.
+        invalidateInterviewCache(false);
 
         // Navigate to the interview with the session ID
         // Only navigate once

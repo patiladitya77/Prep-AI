@@ -88,14 +88,21 @@ export async function GET(request, { params }) {
     });
 
     // Calculate overall statistics
-    const answersWithScores = questionResults.filter(q => q.score !== null);
-    const overallScore = answersWithScores.length > 0
-      ? answersWithScores.reduce((sum, q) => sum + q.score, 0) / answersWithScores.length
-      : 0;
+    const answersWithScores = questionResults.filter((q) => q.score !== null);
+    const overallScore =
+      answersWithScores.length > 0
+        ? answersWithScores.reduce((sum, q) => sum + q.score, 0) /
+          answersWithScores.length
+        : 0;
 
     const totalQuestions = interviewSession.questions.length;
-    const answeredQuestions = questionResults.filter(q => q.answer !== null).length;
-    const completionPercentage = totalQuestions > 0 ? Math.round((answeredQuestions / totalQuestions) * 100) : 0;
+    const answeredQuestions = questionResults.filter(
+      (q) => q.answer !== null
+    ).length;
+    const completionPercentage =
+      totalQuestions > 0
+        ? Math.round((answeredQuestions / totalQuestions) * 100)
+        : 0;
 
     // Determine grade
     let grade = "Not Graded";
@@ -116,7 +123,7 @@ export async function GET(request, { params }) {
         interviewSession.jd?.parsedData?.expReq ||
         interviewSession.jd?.parsedData?.experienceLevel ||
         "0",
-      createdAt:  interviewSession.startedAt ,
+      createdAt: interviewSession.startedAt,
       updatedAt: interviewSession.updatedAt,
       status: interviewSession.status,
       overallScore: parseFloat(overallScore.toFixed(1)),
@@ -133,7 +140,6 @@ export async function GET(request, { params }) {
       success: true,
       data: result,
     });
-
   } catch (error) {
     console.error("❌ Error fetching interview details:", error);
     return NextResponse.json(
@@ -141,6 +147,6 @@ export async function GET(request, { params }) {
       { status: 500 }
     );
   } finally {
-    await prisma.$disconnect();
+    // keep Prisma client alive across requests in dev/server mode
   }
 }
