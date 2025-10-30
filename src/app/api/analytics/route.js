@@ -138,17 +138,17 @@ export async function GET(request) {
     });
 
     const monthlyProgress = Array.from(monthlyMap.entries())
-      .map(([data]) => ({
+      .map(([key, data]) => ({
         month: data.month,
         interviews: data.interviews,
         averageScore:
-          data.scores.length > 0
-            ? data.scores.reduce((sum, score) => sum + score, 0) /
-            data.scores.length
+          Array.isArray(data.scores) && data.scores.length > 0
+            ? data.scores.reduce((sum, score) => sum + score, 0) / data.scores.length
             : 0,
       }))
       .sort((a, b) => b.month.localeCompare(a.month))
       .slice(0, 6);
+
 
     // Resume Analytics from ResumeAnalysis table
     const totalResumeAnalyses = resumeAnalyses.length;
