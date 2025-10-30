@@ -33,8 +33,8 @@ const InterviewMonitoringDisplay: React.FC<InterviewMonitoringDisplayProps> = ({
   };
 
   return (
-    <div className="fixed top-16 right-4 z-50 max-w-xs w-64 hidden md:block">
-      {/* Monitoring Status */}
+    <div className="hidden">
+      {/* Monitoring Status is now hidden */}
       <div
         className={`mb-2 p-2 rounded-lg border shadow-lg ${getWarningBgColor()}`}
       >

@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
 import { useUsageStats } from "../../hooks/useUsageStats";
+import { useState } from "react";
 
 export default function LeftPanel() {
   const pathName = usePathname() || "/";
@@ -93,6 +94,18 @@ export default function LeftPanel() {
     ) : (
       <div>{content}</div>
     );
+  };
+
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
+
+  const handleLogout = () => {
+    setShowLogoutConfirm(true);
+  };
+
+  const confirmLogout = () => {
+    logout();
+    router.push("/login");
+    setShowLogoutConfirm(false);
   };
 
   return (
@@ -258,12 +271,7 @@ export default function LeftPanel() {
             </div>
           </Link>
           <button
-            onClick={() => {
-              const ok = confirm("Are you sure you want to log out?");
-              if (!ok) return;
-              logout();
-              router.push("/login");
-            }}
+            onClick={handleLogout}
             className="ml-2 p-2 rounded-md border border-gray-200 bg-white hover:bg-gray-50"
             aria-label="Log out"
           >
@@ -284,6 +292,41 @@ export default function LeftPanel() {
           </button>
         </div>
       </div>
+
+      {/* Logout Confirmation Dialog */}
+      {showLogoutConfirm && (
+        <div className="fixed inset-0 bg-black/25 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-lg w-full max-w-sm shadow-xl">
+            <div className="p-6">
+              <h2 className="text-xl font-bold text-gray-900 mb-4">
+                Confirm Logout
+              </h2>
+              <div className="mb-6">
+                <p className="text-gray-600">
+                  Are you sure you want to log out from your account?
+                </p>
+                <p className="mt-2 text-sm text-gray-500">
+                  You will need to log in again to access your account.
+                </p>
+              </div>
+              <div className="flex items-center gap-3 justify-end">
+                <button
+                  onClick={() => setShowLogoutConfirm(false)}
+                  className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-50 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={confirmLogout}
+                  className="px-4 py-2 bg-red-600 text-white rounded-lg text-sm font-medium hover:bg-red-700 transition-colors"
+                >
+                  Log Out
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </aside>
   );
 }

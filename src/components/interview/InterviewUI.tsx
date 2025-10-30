@@ -677,7 +677,7 @@ const InterviewUI: React.FC<InterviewUIProps> = ({ sessionId }) => {
             Back to Interview
           </Button> */}
           <Link href="/home/dashboard">
-            <Button className="bg-green-600 hover:bg-green-700">
+            <Button className="bg-black hover:cursor-pointer">
               Return to Dashboard
             </Button>
           </Link>
@@ -749,30 +749,7 @@ const InterviewUI: React.FC<InterviewUIProps> = ({ sessionId }) => {
 
   return (
     <div className="max-w-7xl mx-auto p-4 md:p-8">
-      {/* Debug overlay (development only) */}
-      {process.env.NODE_ENV === "development" && (
-        <div className="fixed top-4 right-4 z-50 bg-white/95 border rounded-md p-2 text-xs text-gray-800 shadow">
-          <div>
-            <strong>FaceCount:</strong> {detectionStatus?.faceCount ?? 0}
-          </div>
-          <div>
-            <strong>Face:</strong>{" "}
-            {detectionStatus?.faceDetected ? "yes" : "no"}
-          </div>
-          <div>
-            <strong>Eyes:</strong>{" "}
-            {detectionStatus?.eyesDetected ? "open" : "closed"}
-          </div>
-          <div>
-            <strong>Looking:</strong>{" "}
-            {detectionStatus?.lookingAtCamera ? "yes" : "no"}
-          </div>
-          <div>
-            <strong>Stream:</strong> {hasStream ? "ok" : "no"}
-          </div>
-        </div>
-      )}
-      {/* Monitoring is now integrated into the camera view */}
+      
 
       {/* Fallback Mode Banner */}
       {fallbackMode && (
