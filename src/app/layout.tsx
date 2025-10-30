@@ -1,9 +1,6 @@
-"use client";
-
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
-import { AuthProvider } from "@/context/AuthContext";
-import { Toaster } from "react-hot-toast";
+import { AuthProviderWrapper } from "@/components/miscellaneous/AuthProviderWrapper";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -15,43 +12,22 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
+export const metadata = {
+  title: "Prep-AI",
+  description: "App description",
+};
+
 export default function RootLayout({
   children,
-}: Readonly<{
+}: {
   children: React.ReactNode;
-}>) {
+}) {
   return (
     <html lang="en">
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
-        <AuthProvider>{children}</AuthProvider>
-        <Toaster
-            position="top-right"
-          toastOptions={{
-            duration: 6000,
-            style: {
-              background: "#363636",
-              color: "#fff",
-              // Force single-line display with ellipsis for long messages
-              whiteSpace: "nowrap",
-              overflow: "hidden",
-              textOverflow: "ellipsis",
-              maxWidth: "600px",
-            },
-            success: {
-              duration: 3000,
-
-            },
-            loading: {
-              duration: 8000,
-              iconTheme: {
-                primary: "#3b82f6",
-                secondary: "#fff",
-              },
-            },
-          }}
-        />
+        <AuthProviderWrapper>{children}</AuthProviderWrapper>
       </body>
     </html>
   );
