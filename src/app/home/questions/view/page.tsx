@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import {
   BookOpen,
@@ -67,7 +67,7 @@ const categories: QuestionCategory[] = [
   },
 ];
 
-export default function ViewQuestionsPage() {
+function ViewQuestionsContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const category = searchParams.get("category");
@@ -433,5 +433,15 @@ export default function ViewQuestionsPage() {
         )}
       </div>
     </div>
+  );
+}
+
+export default function ViewQuestionsPage() {
+  return (
+    <Suspense fallback={<div className="flex items-center justify-center min-h-screen">
+      <Loader2 className="w-8 h-8 animate-spin" />
+    </div>}>
+      <ViewQuestionsContent />
+    </Suspense>
   );
 }
