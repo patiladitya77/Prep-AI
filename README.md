@@ -4,8 +4,6 @@
 
 Prep-AI is an intelligent interview preparation system that leverages Google Gemini AI to generate context-aware interview questions, evaluate answers, and provide detailed feedback. The platform features real-time proctoring, resume analysis, and comprehensive performance tracking to help candidates excel in their job interviews.
 
-![System Architecture](./public/docs/system_architecture.jpg)
-
 ## ✨ Key Features
 
 - **🤖 AI-Powered Question Generation** - Context-aware interview questions tailored to job role, experience level, and resume
@@ -89,53 +87,6 @@ npm run dev
 
 Open [http://localhost:3000](http://localhost:3000) to view the application.
 
-## 📦 Available Scripts
-
-```bash
-npm run dev          # Start development server
-npm run build        # Build for production
-npm run start        # Start production server
-npm run lint         # Run ESLint
-
-# Database commands
-npm run db:generate  # Generate Prisma Client
-npm run db:push      # Push schema changes to database
-npm run db:migrate   # Run database migrations
-npm run db:studio    # Open Prisma Studio
-```
-
-## 🗂️ Project Structure
-
-```
-Prep-AI/
-├── src/
-│   ├── app/                    # Next.js App Router
-│   │   ├── api/               # API Routes
-│   │   │   ├── auth/          # Authentication endpoints
-│   │   │   ├── interview/     # Interview management
-│   │   │   ├── resume/        # Resume operations
-│   │   │   ├── goals/         # Goals management
-│   │   │   └── analytics/     # Analytics endpoints
-│   │   ├── home/              # Dashboard pages
-│   │   ├── interview/         # Interview pages
-│   │   └── login/             # Auth pages
-│   ├── components/            # React components
-│   │   ├── dashboard/         # Dashboard components
-│   │   ├── interview/         # Interview components
-│   │   ├── navigation/        # Navigation components
-│   │   └── ui/                # UI components
-│   ├── context/               # React Context providers
-│   ├── hooks/                 # Custom React hooks
-│   ├── lib/                   # Utility libraries
-│   └── utils/                 # Helper functions
-├── prisma/
-│   ├── schema.prisma          # Database schema
-│   └── migrations/            # Database migrations
-├── public/
-│   └── docs/                  # Documentation assets
-└── package.json
-```
-
 ## 🔑 Environment Variables
 
 Create a `.env` file with the following variables:
@@ -166,6 +117,8 @@ NEXT_PUBLIC_APP_URL="http://localhost:3000"
 - **Gemini API Key**: Get from [Google AI Studio](https://makersuite.google.com/app/apikey)
 - **Google OAuth**: Set up at [Google Cloud Console](https://console.cloud.google.com/)
 - **Database**: Set up PostgreSQL locally or use [Neon](https://neon.tech/), [Supabase](https://supabase.com/), or [Railway](https://railway.app/)
+
+![System Architecture](./public/docs/system_architecture.jpg)
 
 ## 🎯 Core Functionality
 
@@ -239,21 +192,6 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 3. Commit your changes (`git commit -m 'Add some AmazingFeature'`)
 4. Push to the branch (`git push origin feature/AmazingFeature`)
 5. Open a Pull Request
-
-## 📝 License
-
-This project is licensed under the MIT License.
-
-## 👥 Authors
-
-- **Sahil Khude** - [@sahilkhude117](https://github.com/sahilkhude117)
-
-## 🙏 Acknowledgments
-
-- Google Gemini AI for intelligent question generation and evaluation
-- MediaPipe for real-time face detection capabilities
-- Next.js team for the amazing framework
-- Prisma for the excellent database toolkit
 
 ---
 
