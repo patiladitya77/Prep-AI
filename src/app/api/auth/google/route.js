@@ -1,4 +1,5 @@
-const { NextResponse } = require("next/server");
+
+import { NextResponse } from "next/server";
 
 // Start Google OAuth2 flow by redirecting to Google's consent screen
 function GET() {

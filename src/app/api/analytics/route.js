@@ -59,9 +59,9 @@ export async function GET(request) {
     const averageScore =
       completedSessionsWithScores.length > 0
         ? completedSessionsWithScores.reduce(
-            (sum, session) => sum + (session.score || 0),
-            0
-          ) / completedSessionsWithScores.length
+          (sum, session) => sum + (session.score || 0),
+          0
+        ) / completedSessionsWithScores.length
         : 0;
 
     // Recent interviews (last 10)
@@ -102,7 +102,7 @@ export async function GET(request) {
         averageScore:
           data.scores.length > 0
             ? data.scores.reduce((sum, score) => sum + score, 0) /
-              data.scores.length
+            data.scores.length
             : 0,
         count: data.count,
       }))
@@ -111,7 +111,7 @@ export async function GET(request) {
 
     // Monthly progress - group by month
     const monthlyMap = new Map();
-    const now = new Date();
+    // const now = new Date();
 
     interviewSessions.forEach((session) => {
       const sessionDate = new Date(session.startedAt);
@@ -138,13 +138,13 @@ export async function GET(request) {
     });
 
     const monthlyProgress = Array.from(monthlyMap.entries())
-      .map(([key, data]) => ({
+      .map(([data]) => ({
         month: data.month,
         interviews: data.interviews,
         averageScore:
           data.scores.length > 0
             ? data.scores.reduce((sum, score) => sum + score, 0) /
-              data.scores.length
+            data.scores.length
             : 0,
       }))
       .sort((a, b) => b.month.localeCompare(a.month))
@@ -206,9 +206,9 @@ export async function GET(request) {
     const averageResumeScore =
       resumesWithScores.length > 0
         ? Math.round(
-            resumesWithScores.reduce((sum, resume) => sum + resume.score, 0) /
-              resumesWithScores.length
-          )
+          resumesWithScores.reduce((sum, resume) => sum + resume.score, 0) /
+          resumesWithScores.length
+        )
         : 0;
 
     // Recent resume analyses
@@ -241,9 +241,9 @@ export async function GET(request) {
         averageScore:
           data.scores.length > 0
             ? Math.round(
-                data.scores.reduce((sum, score) => sum + score, 0) /
-                  data.scores.length
-              )
+              data.scores.reduce((sum, score) => sum + score, 0) /
+              data.scores.length
+            )
             : 0,
       }))
       .sort((a, b) => b.count - a.count)

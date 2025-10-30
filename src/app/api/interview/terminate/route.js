@@ -1,6 +1,6 @@
-const { NextResponse } = require("next/server");
-const { PrismaClient } = require("@prisma/client");
-const jwt = require("jsonwebtoken");
+import { NextResponse } from "next/server";
+import { PrismaClient } from "@prisma/client";
+import jwt from "jsonwebtoken"
 
 const prisma = new PrismaClient();
 const JWT_SECRET = process.env.JWT_SECRET || "your-secret-key";
@@ -64,9 +64,8 @@ async function POST(request) {
       data: {
         status: "ABANDONED",
         endedAt: new Date(),
-        feedback: `Interview terminated: ${reason}. Warning count: ${
-          warningCount || 0
-        }`,
+        feedback: `Interview terminated: ${reason}. Warning count: ${warningCount || 0
+          }`,
       },
     });
 

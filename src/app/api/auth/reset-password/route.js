@@ -1,13 +1,14 @@
-const { NextResponse } = require("next/server");
-const { PrismaClient } = require("@prisma/client");
-const { hashPassword } = require("@/lib/auth/helpers");
+import { NextResponse } from "next/server";
+import { PrismaClient } from "@prisma/client";
+import { hashPassword } from "@/lib/auth/helpers";
+
 
 const prisma = new PrismaClient();
 
 async function POST(request) {
   try {
     const body = await request.json();
-    const { token, newPassword, email } = body;
+    const { token, newPassword } = body;
 
     // Validation
     if (!token || !newPassword) {

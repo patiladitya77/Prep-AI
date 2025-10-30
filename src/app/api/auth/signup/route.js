@@ -1,14 +1,16 @@
-const { NextResponse } = require("next/server");
-const { PrismaClient } = require("@prisma/client");
-const {
+
+import { NextResponse } from "next/server";
+import { PrismaClient } from "@prisma/client";
+
+
+import {
   hashPassword,
   generateToken,
   excludePassword,
   validateEmail,
-  validatePassword,
   validatePasswordDetailed,
   validateName,
-} = require("@/lib/auth/helpers");
+} from "@/lib/auth/helpers"
 
 const prisma = new PrismaClient();
 

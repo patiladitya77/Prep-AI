@@ -4,10 +4,15 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { PageLoading } from "@/components/ui/Loading";
+import { useUsageStats } from "@/hooks/useUsageStats";
+import { Dialog } from "@headlessui/react";
 
 export default function Dashboard() {
   const router = useRouter();
   const { user, isAuthenticated, isLoading } = useAuth();
+  const { usage, loading } = useUsageStats();
+  const [showPricing, setShowPricing] = useState(false);
+  const [showExhausted, setShowExhausted] = useState(false);
 
   useEffect(() => {
     if (!isLoading && !isAuthenticated) {
@@ -22,12 +27,38 @@ export default function Dashboard() {
   if (!isAuthenticated) {
     return null;
   }
+  // if (loading) return <p>Loading usage data...</p>;
 
   const handleStartInterview = () => {
+    if (!usage) return;
+
+    const isInterviewLimitReached =
+      usage.interviews.used >= usage.interviews.limit;
+
+    if (isInterviewLimitReached) {
+      if (!user?.isPremium) {
+        setShowPricing(true);
+      } else {
+        setShowExhausted(true);
+      }
+      return;
+    }
     router.push("/interview/setup");
   };
 
   const handleResumeCheck = () => {
+    if (!usage) return;
+
+    const isResumeLimitReached = usage.resumes.used >= usage.resumes.limit;
+
+    if (isResumeLimitReached) {
+      if (!user?.isPremium) {
+        setShowPricing(true);
+      } else {
+        setShowExhausted(true);
+      }
+      return;
+    }
     router.push("/resume-check");
   };
 
@@ -110,9 +141,9 @@ export default function Dashboard() {
         </div>
         <div className="bg-white rounded-lg p-4 border-l-4 border-blue-500">
           <p className="text-gray-800 text-base font-medium italic">
-            "Success in interviews isn't about having perfect answers—it's about
+            Success in interviews isnt about having perfect answers its about
             showing your authentic self, demonstrating your growth mindset, and
-            connecting genuinely with the people you're meeting."
+            connecting genuinely with the people you are meeting.
           </p>
         </div>
       </div>
@@ -120,6 +151,65 @@ export default function Dashboard() {
       <div>
         <PreviousMockContainer />
       </div>
+      {/* Pricing Modal */}
+      <Dialog
+        open={showPricing}
+        onClose={() => setShowPricing(false)}
+        className="relative z-50"
+      >
+        <div className="fixed inset-0 bg-black/30 flex items-center justify-center">
+          <div className="bg-white rounded-lg shadow-lg p-6 max-w-sm w-full">
+            <h2 className="text-xl font-semibold mb-2 text-center">
+              Interview Limit Reached
+            </h2>
+            <p className="text-gray-600 mb-4 text-center">
+              You’ve used all your free attempts. Upgrade to unlock unlimited
+              access.
+            </p>
+            <div className="flex justify-center gap-3">
+              <button
+                onClick={() => router.push("/pricing")}
+                className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700"
+              >
+                View Plans
+              </button>
+              <button
+                onClick={() => setShowPricing(false)}
+                className="bg-gray-200 text-gray-700 px-4 py-2 rounded-md hover:bg-gray-300"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      </Dialog>
+
+      {/* Exhausted Modal */}
+      <Dialog
+        open={showExhausted}
+        onClose={() => setShowExhausted(false)}
+        className="relative z-50"
+      >
+        <div className="fixed inset-0 bg-black/30 flex items-center justify-center">
+          <div className="bg-white rounded-lg shadow-lg p-6 max-w-sm w-full">
+            <h2 className="text-xl font-semibold mb-2 text-center">
+              Limit Exhausted
+            </h2>
+            <p className="text-gray-600 mb-4 text-center">
+              You’ve reached your current usage limit. Please wait for your next
+              cycle or contact support for assistance.
+            </p>
+            <div className="flex justify-center">
+              <button
+                onClick={() => setShowExhausted(false)}
+                className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700"
+              >
+                Okay
+              </button>
+            </div>
+          </div>
+        </div>
+      </Dialog>
     </div>
   );
 }

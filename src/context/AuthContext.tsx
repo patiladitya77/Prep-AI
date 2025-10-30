@@ -7,6 +7,7 @@ interface User {
   email: string;
   createdAt: string;
   updatedAt: string;
+  isPremium?: boolean;
 }
 
 interface AuthContextType {
@@ -16,6 +17,7 @@ interface AuthContextType {
   isLoading: boolean;
   login: (token: string, user: User) => void;
   logout: () => void;
+  updateUser: (updatedFields: Partial<User>) => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -119,6 +121,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       localStorage.removeItem("user");
     }
   };
+  const updateUser = (updatedFields: Partial<User>) => {
+    setUser((prev) => {
+      const newUser = { ...prev, ...updatedFields } as User;
+      if (typeof window !== "undefined") {
+        localStorage.setItem("user", JSON.stringify(newUser));
+      }
+      return newUser;
+    });
+  };
 
   const value = {
     user,
@@ -127,6 +138,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     isLoading,
     login,
     logout,
+    updateUser,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

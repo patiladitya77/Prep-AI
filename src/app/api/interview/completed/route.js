@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import { PrismaClient } from "@prisma/client";
 import { verifyToken } from "@/lib/auth/helpers.js";
 
@@ -65,9 +65,9 @@ export async function GET(request) {
       const overallScore =
         answersWithScores.length > 0
           ? answersWithScores.reduce(
-              (sum, answer) => sum + (answer.score || 0),
-              0
-            ) / answersWithScores.length
+            (sum, answer) => sum + (answer.score || 0),
+            0
+          ) / answersWithScores.length
           : 0;
 
       // Determine grade

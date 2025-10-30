@@ -1,7 +1,8 @@
-const { NextResponse } = require("next/server");
-const { PrismaClient } = require("@prisma/client");
-const { GoogleGenerativeAI } = require("@google/generative-ai");
-const jwt = require("jsonwebtoken");
+import { NextResponse } from "next/server";
+import { PrismaClient } from "@prisma/client";
+import { GoogleGenerativeAI } from "@google/generative-ai";
+import jwt from "jsonwebtoken";
+
 
 const prisma = new PrismaClient();
 const JWT_SECRET = process.env.JWT_SECRET || "your-secret-key";
@@ -100,46 +101,40 @@ async function POST(request) {
         resumeInfo = `
         Resume Information:
         - Name: ${resumeData.name || "N/A"}
-        - Skills: ${
-          Array.isArray(resumeData.skills)
+        - Skills: ${Array.isArray(resumeData.skills)
             ? resumeData.skills.join(", ")
             : "N/A"
-        }
-        - Experience: ${
-          Array.isArray(resumeData.experience)
+          }
+        - Experience: ${Array.isArray(resumeData.experience)
             ? resumeData.experience
-                .map(
-                  (exp) => `${exp.position} at ${exp.company} (${exp.duration})`
-                )
-                .join("; ")
+              .map(
+                (exp) => `${exp.position} at ${exp.company} (${exp.duration})`
+              )
+              .join("; ")
             : "N/A"
-        }
-        - Projects: ${
-          Array.isArray(resumeData.projects)
+          }
+        - Projects: ${Array.isArray(resumeData.projects)
             ? resumeData.projects
-                .map(
-                  (proj) =>
-                    `${proj.name || proj.title}: ${
-                      proj.description || ""
-                    } (Technologies: ${
-                      Array.isArray(proj.technologies)
-                        ? proj.technologies.join(", ")
-                        : proj.tech || "N/A"
-                    })`
-                )
-                .join("; ")
+              .map(
+                (proj) =>
+                  `${proj.name || proj.title}: ${proj.description || ""
+                  } (Technologies: ${Array.isArray(proj.technologies)
+                    ? proj.technologies.join(", ")
+                    : proj.tech || "N/A"
+                  })`
+              )
+              .join("; ")
             : "N/A"
-        }
-        - Education: ${
-          Array.isArray(resumeData.education)
+          }
+        - Education: ${Array.isArray(resumeData.education)
             ? resumeData.education
-                .map(
-                  (edu) =>
-                    `${edu.degree} in ${edu.field} from ${edu.institution}`
-                )
-                .join("; ")
+              .map(
+                (edu) =>
+                  `${edu.degree} in ${edu.field} from ${edu.institution}`
+              )
+              .join("; ")
             : "N/A"
-        }
+          }
         - Summary: ${resumeData.summary || "N/A"}
         `;
       } else {

@@ -1,5 +1,6 @@
-const { NextResponse } = require("next/server");
-const { PrismaClient } = require("@prisma/client");
+import { NextResponse } from "next/server";
+import { PrismaClient } from "@prisma/client";
+
 
 const prisma = new PrismaClient();
 
