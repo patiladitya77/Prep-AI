@@ -45,7 +45,13 @@ async function POST(request) {
     } = body;
 
     // Validate required fields
-    if (!sessionId || !jobDescription || !experienceLevel || !jobRole) {
+    if (
+      !sessionId ||
+      !jobDescription ||
+      experienceLevel === undefined ||
+      experienceLevel === null ||
+      !jobRole
+    ) {
       return NextResponse.json(
         {
           error:
@@ -54,6 +60,7 @@ async function POST(request) {
         { status: 400 }
       );
     }
+
 
     // Verify the session belongs to the user and get resume data
     const session = await prisma.interviewSession.findFirst({
@@ -154,7 +161,7 @@ async function POST(request) {
         === CANDIDATE'S RESUME ===
         ${resumeInfo}
 
-        TASK: Generate exactly 10 highly personalized and relevant interview questions based on the analysis above.
+        TASK: Generate exactly 3 highly personalized and relevant interview questions based on the analysis above.
 
         ANALYSIS REQUIREMENTS:
         1. Identify key technical skills mentioned in the job description
@@ -166,7 +173,7 @@ async function POST(request) {
 
         QUESTION GENERATION RULES:
         
-        TECHNICAL QUESTIONS (6 out of 10):
+        TECHNICAL QUESTIONS (2 out of 3):
         - Focus on technologies/frameworks mentioned in BOTH job description AND resume
         - Reference specific projects by name and ask about technical decisions
         - Ask about architecture choices and challenges in their projects
@@ -175,7 +182,7 @@ async function POST(request) {
         - Include coding/problem-solving scenarios relevant to the job
         - Deep dive into project technologies and implementation details
         
-        BEHAVIORAL QUESTIONS (4 out of 10):
+        BEHAVIORAL QUESTIONS (1 out of 3):
         - Reference specific experiences from their resume
         - Ask about transitions between companies/roles
         - Explore leadership experience for senior positions

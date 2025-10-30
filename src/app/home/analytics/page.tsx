@@ -218,7 +218,7 @@ export default function Analytics() {
           </CardContent>
         </Card>
 
-        <Card>
+        {/* <Card>
           <CardHeader className="pb-3">
             <CardTitle className="text-sm font-medium text-gray-600">
               Total Resumes
@@ -229,9 +229,9 @@ export default function Analytics() {
               {analytics.resumeAnalytics?.totalResumes || 0}
             </div>
           </CardContent>
-        </Card>
+        </Card> */}
 
-        <Card>
+        {/* <Card>
           <CardHeader className="pb-3">
             <CardTitle className="text-sm font-medium text-gray-600">
               Resume Score
@@ -250,7 +250,7 @@ export default function Analytics() {
                 : "N/A"}
             </div>
           </CardContent>
-        </Card>
+        </Card> */}
       </div>
 
       {/* Recent Interviews and Skills Analysis */}

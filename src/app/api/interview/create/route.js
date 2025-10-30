@@ -145,6 +145,13 @@ async function POST(request) {
       });
 
       // Automatically trigger question generation
+      console.log("🧩 Generating questions with data:", {
+        sessionId: interviewSession.id,
+        jobRole,
+        jobDescription,
+        experienceLevel: expYears,
+      });
+
       try {
         const questionGenerationResponse = await fetch(
           `${process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000"
@@ -164,9 +171,16 @@ async function POST(request) {
           }
         );
 
+        // if (!questionGenerationResponse.ok) {
+        //   console.error("Failed to generate questions automatically");
+        // }
+        const questionData = await questionGenerationResponse.json();
         if (!questionGenerationResponse.ok) {
-          console.error("Failed to generate questions automatically");
+          console.error("Failed to generate questions automatically:", questionData);
+        } else {
+          console.log("✅ Questions generated successfully:", questionData?.questions?.length || 0);
         }
+
       } catch (questionError) {
         console.error("Error generating questions:", questionError);
         // Don't fail the session creation if question generation fails
