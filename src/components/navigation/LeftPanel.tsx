@@ -7,8 +7,6 @@ import {
   BookOpen,
   Target,
   Upload,
-  Bookmark,
-  MessageSquare,
   Sparkles,
   User,
 } from "lucide-react";
@@ -19,6 +17,7 @@ export default function LeftPanel() {
   const pathName = usePathname() || "/";
   const router = useRouter();
   const { user, logout } = useAuth();
+  console.log(user);
   const { usage, loading: usageLoading } = useUsageStats();
 
   type NavItemProps = {
@@ -180,7 +179,7 @@ export default function LeftPanel() {
               Usage
             </span>
             <span className="px-2 py-1 text-xs font-semibold rounded-full bg-black text-white shadow-sm">
-              Free Plan
+              {user?.isPremium ? "Pro " : "Free plan"}
             </span>
           </div>
 
@@ -226,10 +225,22 @@ export default function LeftPanel() {
             </div>
           </div>
 
-          <button className="w-full bg-black hover:bg-gray-900 text-white rounded-xl py-2.5 text-sm font-semibold shadow-lg hover:shadow-xl transition-all duration-200 flex items-center justify-center gap-2 group">
-            <Sparkles className="w-4 h-4 group-hover:rotate-12 transition-transform duration-200" />
-            Upgrade to Pro
-          </button>
+          {user?.isPremium ? (
+            <button
+              disabled
+              className="w-full bg-gray-300 text-gray-600 rounded-xl py-2.5 text-sm font-semibold shadow-md cursor-not-allowed flex items-center justify-center gap-2"
+            >
+              <Sparkles className="w-4 h-4 text-yellow-500" />
+              Pro Activated
+            </button>
+          ) : (
+            <Link href="/pricing">
+              <button className="w-full bg-black hover:bg-gray-900 text-white rounded-xl py-2.5 text-sm font-semibold shadow-lg hover:shadow-xl transition-all duration-200 flex items-center justify-center gap-2 group cursor-pointer">
+                <Sparkles className="w-4 h-4 group-hover:rotate-12 transition-transform duration-200" />
+                Upgrade to Pro
+              </button>
+            </Link>
+          )}
         </div>
       </div>
       {/* Profile Footer (profile link + logout) */}
