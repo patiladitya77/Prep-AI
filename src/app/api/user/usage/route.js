@@ -17,6 +17,19 @@ export async function GET(request) {
     // Verify the JWT token
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
     const userId = decoded.userId;
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+
+        isPremium: true,
+
+      },
+    });
+
+    if (!user) {
+      return NextResponse.json({ error: "User not found" }, { status: 404 });
+    }
+
 
     // Get user's interview sessions count
     const interviewCount = await prisma.interviewSession.count({
@@ -29,10 +42,18 @@ export async function GET(request) {
     });
 
     // Define limits (you can make these configurable)
-    const limits = {
-      interviews: 4,
-      resumes: 6,
-    };
+    let limits;
+    if (user.isPremium) {
+      limits = {
+        interviews: 10,
+        resumes: 20
+      }
+    } else {
+      limits = {
+        interviews: 4,
+        resumes: 6,
+      };
+    }
 
     // Calculate usage statistics
     const usage = {

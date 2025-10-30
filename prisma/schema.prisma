@@ -23,6 +23,7 @@ model User {
   resumeAnalyses    ResumeAnalysis[]
   resumes           Resume[]
   goals             Goal[]
+  isPremium         Boolean            @default(false) @map("is_premium")
 
   @@map("users")
 }
