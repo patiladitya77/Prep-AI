@@ -59,9 +59,9 @@ export async function GET(request) {
     const averageScore =
       completedSessionsWithScores.length > 0
         ? completedSessionsWithScores.reduce(
-          (sum, session) => sum + (session.score || 0),
-          0
-        ) / completedSessionsWithScores.length
+            (sum, session) => sum + (session.score || 0),
+            0
+          ) / completedSessionsWithScores.length
         : 0;
 
     // Recent interviews (last 10)
@@ -102,7 +102,7 @@ export async function GET(request) {
         averageScore:
           data.scores.length > 0
             ? data.scores.reduce((sum, score) => sum + score, 0) /
-            data.scores.length
+              data.scores.length
             : 0,
         count: data.count,
       }))
@@ -143,12 +143,12 @@ export async function GET(request) {
         interviews: data.interviews,
         averageScore:
           Array.isArray(data.scores) && data.scores.length > 0
-            ? data.scores.reduce((sum, score) => sum + score, 0) / data.scores.length
+            ? data.scores.reduce((sum, score) => sum + score, 0) /
+              data.scores.length
             : 0,
       }))
       .sort((a, b) => b.month.localeCompare(a.month))
       .slice(0, 6);
-
 
     // Resume Analytics from ResumeAnalysis table
     const totalResumeAnalyses = resumeAnalyses.length;
@@ -206,9 +206,9 @@ export async function GET(request) {
     const averageResumeScore =
       resumesWithScores.length > 0
         ? Math.round(
-          resumesWithScores.reduce((sum, resume) => sum + resume.score, 0) /
-          resumesWithScores.length
-        )
+            resumesWithScores.reduce((sum, resume) => sum + resume.score, 0) /
+              resumesWithScores.length
+          )
         : 0;
 
     // Recent resume analyses
@@ -241,9 +241,9 @@ export async function GET(request) {
         averageScore:
           data.scores.length > 0
             ? Math.round(
-              data.scores.reduce((sum, score) => sum + score, 0) /
-              data.scores.length
-            )
+                data.scores.reduce((sum, score) => sum + score, 0) /
+                  data.scores.length
+              )
             : 0,
       }))
       .sort((a, b) => b.count - a.count)
