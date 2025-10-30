@@ -1,8 +1,8 @@
-const { NextResponse } = require("next/server");
-const { PrismaClient } = require("@prisma/client");
-const { generateToken, excludePassword } = require("@/lib/auth/helpers");
-const crypto = require("crypto");
-const { hashPassword } = require("@/lib/auth/helpers");
+import { NextResponse } from "next/server";
+import { PrismaClient } from "@prisma/client";
+import { generateToken, hashPassword } from "@/lib/auth/helpers";
+import crypto from "crypto";
+
 
 const prisma = new PrismaClient();
 

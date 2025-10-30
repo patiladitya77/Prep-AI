@@ -1,7 +1,7 @@
 ﻿"use client";
 import PreviousMockContainer from "@/components/dashboard/PreviousMockContainer";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { PageLoading } from "@/components/ui/Loading";
 
@@ -110,9 +110,9 @@ export default function Dashboard() {
         </div>
         <div className="bg-white rounded-lg p-4 border-l-4 border-blue-500">
           <p className="text-gray-800 text-base font-medium italic">
-            "Success in interviews isn't about having perfect answers—it's about
+            Success in interviews isnt about having perfect answers its about
             showing your authentic self, demonstrating your growth mindset, and
-            connecting genuinely with the people you're meeting."
+            connecting genuinely with the people you are meeting.
           </p>
         </div>
       </div>

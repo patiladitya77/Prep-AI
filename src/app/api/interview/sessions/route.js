@@ -1,6 +1,6 @@
-const { NextResponse } = require("next/server");
-const { PrismaClient } = require("@prisma/client");
-const jwt = require("jsonwebtoken");
+import { NextResponse } from "next/server";
+import { PrismaClient } from "@prisma/client";
+import jwt from "jsonwebtoken"
 
 const prisma = new PrismaClient();
 const JWT_SECRET = process.env.JWT_SECRET || "your-secret-key";
@@ -88,10 +88,10 @@ async function GET(request) {
       experienceYears: session.experience_years,
       resume: session.resume
         ? {
-            id: session.resume.id,
-            fileName: session.resume.file_name,
-            parsedData: session.resume.parsedData,
-          }
+          id: session.resume.id,
+          fileName: session.resume.file_name,
+          parsedData: session.resume.parsedData,
+        }
         : null,
     }));
 

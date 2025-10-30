@@ -1,7 +1,8 @@
-const { NextResponse } = require("next/server");
-const { PrismaClient } = require("@prisma/client");
-const { validateEmail } = require("@/lib/auth/helpers");
-const crypto = require("crypto");
+import { NextResponse } from "next/server";
+import { PrismaClient } from "@prisma/client";
+import { validateEmail } from "@/lib/auth/helpers";
+import crypto from "crypto";
+
 
 const prisma = new PrismaClient();
 
@@ -47,11 +48,10 @@ async function POST(request) {
         },
       });
 
-      const resetUrl = `${
-        process.env.NEXTAUTH_URL || "http://localhost:3000"
-      }/reset-password?token=${resetToken}&email=${encodeURIComponent(
-        email.toLowerCase()
-      )}`;
+      const resetUrl = `${process.env.NEXTAUTH_URL || "http://localhost:3000"
+        }/reset-password?token=${resetToken}&email=${encodeURIComponent(
+          email.toLowerCase()
+        )}`;
 
       // TODO: Implement email sending
       // await sendPasswordResetEmail(email, resetToken);

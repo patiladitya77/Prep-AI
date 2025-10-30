@@ -5,7 +5,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 import { useState, useEffect } from "react";
-import Loading, { PageLoading, InlineLoading } from "@/components/ui/Loading";
+import Loading, { InlineLoading } from "@/components/ui/Loading";
 import Pricing from "./pricing/page";
 
 interface AnalyticsData {

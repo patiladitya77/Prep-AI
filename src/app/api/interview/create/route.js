@@ -1,6 +1,7 @@
-const { NextResponse } = require("next/server");
-const { PrismaClient } = require("@prisma/client");
-const jwt = require("jsonwebtoken");
+import { NextResponse } from "next/server";
+import { PrismaClient } from "@prisma/client";
+import jwt from "jsonwebtoken"
+
 
 const prisma = new PrismaClient();
 const JWT_SECRET = process.env.JWT_SECRET || "your-secret-key";
@@ -146,8 +147,7 @@ async function POST(request) {
       // Automatically trigger question generation
       try {
         const questionGenerationResponse = await fetch(
-          `${
-            process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000"
+          `${process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000"
           }/api/interview/generate-questions`,
           {
             method: "POST",

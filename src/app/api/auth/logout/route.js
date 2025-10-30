@@ -1,4 +1,5 @@
-const { NextResponse } = require("next/server");
+
+import { NextResponse } from "next/server";
 
 async function POST() {
   return NextResponse.json(
