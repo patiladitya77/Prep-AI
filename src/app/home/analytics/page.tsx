@@ -10,6 +10,63 @@ import {
   CardLoading,
   InlineLoading,
 } from "@/components/ui/Loading";
+import {
+  Chart as ChartJS,
+  CategoryScale,
+  LinearScale,
+  PointElement,
+  LineElement,
+  Title,
+  Tooltip,
+  Legend,
+} from "chart.js";
+import { Line } from "react-chartjs-2";
+import { Loader2 } from "lucide-react";
+
+// Chevron SVG components
+const ChevronDownIcon = () => (
+  <svg
+    xmlns="http://www.w3.org/2000/svg"
+    className="h-4 w-4"
+    fill="none"
+    viewBox="0 0 24 24"
+    stroke="currentColor"
+  >
+    <path
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      strokeWidth={2}
+      d="M19 9l-7 7-7-7"
+    />
+  </svg>
+);
+
+const ChevronUpIcon = () => (
+  <svg
+    xmlns="http://www.w3.org/2000/svg"
+    className="h-4 w-4"
+    fill="none"
+    viewBox="0 0 24 24"
+    stroke="currentColor"
+  >
+    <path
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      strokeWidth={2}
+      d="M5 15l7-7 7 7"
+    />
+  </svg>
+);
+
+ChartJS.register(
+  CategoryScale,
+  LinearScale,
+  PointElement,
+  LineElement,
+  Title,
+  Tooltip,
+  Legend
+);
 
 interface AnalyticsData {
   totalInterviews: number;
@@ -20,12 +77,17 @@ interface AnalyticsData {
     score: number;
     startedAt: string;
     status: string;
-    jdData?: any;
+    jdData?: {
+      title?: string;
+      skillsReq?: string[];
+      expReq?: number;
+    };
   }>;
   skillsAnalysis: Array<{
     skill: string;
     averageScore: number;
     count: number;
+    domain?: string;
   }>;
   monthlyProgress: Array<{
     month: string;
@@ -53,11 +115,225 @@ interface AnalyticsData {
   };
 }
 
+// Domain Progress Chart Component
+function DomainProgressChart({
+  interviews,
+}: {
+  interviews: AnalyticsData["recentInterviews"];
+}) {
+  // Process interviews to group by domain and calculate average scores over time
+  const domainData = interviews.reduce((acc, interview) => {
+    // Try to extract domain from different possible locations in jdData
+    let domain = "Unknown";
+    if (interview.jdData) {
+      // Try to get domain from job title first
+      if (interview.jdData.title) {
+        // Use the full title as the domain to keep the complete role name
+        domain = interview.jdData.title;
+      }
+      // If no title, try to extract from skills
+      else if (
+        Array.isArray(interview.jdData.skillsReq) &&
+        interview.jdData.skillsReq.length > 0
+      ) {
+        // Try to get a meaningful role from the skills requirement
+        const skill = interview.jdData.skillsReq[0];
+        // Look for role keywords in the skill description
+        if (skill.toLowerCase().includes("developer")) {
+          const parts = skill.split(" with")[0].split(" "); // Get the part before "with"
+          domain = parts.join(" "); // Join all words to get full role name
+        } else {
+          domain = skill.split(" ")[0]; // Fallback to first word if no clear role
+        }
+      }
+    }
+
+    // Skip interviews that are not completed or have no score
+    if (
+      interview.status !== "COMPLETED" ||
+      interview.score === null ||
+      interview.score === undefined
+    ) {
+      return acc;
+    }
+
+    // Skip interviews with no score
+    if (interview.score === null || interview.score === undefined) {
+      return acc;
+    }
+
+    if (!acc[domain]) {
+      acc[domain] = [];
+    }
+    acc[domain].push({
+      date: new Date(interview.startedAt),
+      score: interview.score,
+    });
+    return acc;
+  }, {} as Record<string, Array<{ date: Date; score: number }>>);
+
+  // Sort data points by date for each domain
+  Object.keys(domainData).forEach((domain) => {
+    domainData[domain].sort((a, b) => a.date.getTime() - b.date.getTime());
+  });
+
+  // Get unique dates across all interviews
+  const allDates = [
+    ...new Set(
+      interviews.map((i) => new Date(i.startedAt).toLocaleDateString())
+    ),
+  ].sort();
+
+  // Prepare chart data
+  // Filter out domains with no valid scores
+  const validDomains = Object.entries(domainData).filter(
+    ([_, scores]) => scores.length > 0
+  );
+
+  // If no valid domains, show a message
+  if (validDomains.length === 0) {
+    return (
+      <div className="h-full flex items-center justify-center">
+        <p className="text-gray-500">No scored interviews available yet</p>
+      </div>
+    );
+  }
+
+  const data = {
+    labels: allDates,
+    datasets: validDomains.map(([domain, scores], index) => ({
+      label: domain,
+      data: allDates.map((date) => {
+        const matchingScore = scores.find(
+          (s) => s.date.toLocaleDateString() === date
+        );
+        return matchingScore ? matchingScore.score : null;
+      }),
+      borderColor: [
+        "#3b82f6", // bright blue
+        "#22c55e", // bright green
+        "#a855f7", // bright purple
+        "#f97316", // bright orange
+        "#ef4444", // bright red
+        "#06b6d4", // cyan
+        "#ec4899", // pink
+      ][index % 7],
+      backgroundColor: [
+        "#3b82f620", // semi-transparent versions
+        "#22c55e20",
+        "#a855f720",
+        "#f9731620",
+        "#ef444420",
+        "#06b6d420",
+        "#ec489920",
+      ][index % 7],
+      borderWidth: 2,
+      tension: 0.4,
+      fill: true,
+      spanGaps: true,
+      pointRadius: 4,
+      pointHoverRadius: 6,
+    })),
+  };
+
+  const options = {
+    responsive: true,
+    maintainAspectRatio: false,
+    scales: {
+      y: {
+        type: "linear" as const,
+        beginAtZero: true,
+        max: 100,
+        title: {
+          display: true,
+          text: "Score (%)",
+          font: {
+            size: 14,
+            weight: "bold" as const,
+          },
+        },
+        grid: {
+          color: "#e5e7eb",
+          drawBorder: false,
+        },
+        ticks: {
+          stepSize: 20,
+          font: {
+            size: 12,
+          },
+        },
+      },
+      x: {
+        type: "category" as const,
+        title: {
+          display: true,
+          text: "Interview Date",
+          font: {
+            size: 14,
+            weight: "bold" as const,
+          },
+        },
+        grid: {
+          display: false,
+        },
+        ticks: {
+          maxRotation: 45,
+          minRotation: 45,
+          font: {
+            size: 12,
+          },
+        },
+      },
+    },
+    plugins: {
+      legend: {
+        position: "top" as const,
+        align: "start" as const,
+        labels: {
+          boxWidth: 15,
+          usePointStyle: true,
+          padding: 20,
+          font: {
+            size: 13,
+          },
+        },
+      },
+      tooltip: {
+        backgroundColor: "rgba(0, 0, 0, 0.8)",
+        padding: 12,
+        bodySpacing: 4,
+        callbacks: {
+          title: (tooltipItems: any) => {
+            return new Date(tooltipItems[0].label).toLocaleDateString("en-US", {
+              month: "short",
+              day: "numeric",
+              year: "numeric",
+            });
+          },
+          label: (context: any) => {
+            return `${context.dataset.label}: ${context.parsed.y?.toFixed(1)}%`;
+          },
+        },
+      },
+    },
+    interaction: {
+      intersect: false,
+      mode: "nearest" as const,
+    },
+    animation: {
+      duration: 1000,
+    },
+  };
+
+  return <Line data={data} options={options} />;
+}
+
 export default function Analytics() {
   const router = useRouter();
   const { user, isAuthenticated, isLoading } = useAuth();
   const [analytics, setAnalytics] = useState<AnalyticsData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [showAllInterviews, setShowAllInterviews] = useState(false);
 
   useEffect(() => {
     if (!isLoading && !isAuthenticated) {
@@ -99,8 +375,15 @@ export default function Analytics() {
     router.push("/home/dashboard");
   };
 
-  if (isLoading || loading) {
-    return <PageLoading text="Loading analytics..." />;
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <Loader2 className="w-8 h-8 animate-spin text-blue-600 mx-auto mb-4" />
+          <p className="text-gray-600">Loading your analytics...</p>
+        </div>
+      </div>
+    );
   }
 
   if (!isAuthenticated) {
@@ -184,17 +467,24 @@ export default function Analytics() {
         <Card>
           <CardHeader className="pb-3">
             <CardTitle className="text-sm font-medium text-gray-600">
-              Interview Score
+              Monthly Progress
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div
-              className={`text-2xl font-bold ${getScoreColor(
-                analytics.averageScore
-              )}`}
-            >
-              {analytics.averageScore.toFixed(1)}%
-            </div>
+            {analytics.monthlyProgress &&
+            analytics.monthlyProgress.length > 0 ? (
+              <div className="text-2xl font-bold text-blue-600">
+                {analytics.monthlyProgress[0].averageScore.toFixed(1)}%
+                {analytics.monthlyProgress[0].averageScore >
+                (analytics.monthlyProgress[1]?.averageScore || 0) ? (
+                  <span className="text-sm text-green-600 ml-2">↑</span>
+                ) : (
+                  <span className="text-sm text-red-600 ml-2">↓</span>
+                )}
+              </div>
+            ) : (
+              <div className="text-2xl font-bold text-gray-400">-</div>
+            )}
           </CardContent>
         </Card>
 
@@ -218,39 +508,25 @@ export default function Analytics() {
           </CardContent>
         </Card>
 
-        {/* <Card>
+        <Card>
           <CardHeader className="pb-3">
             <CardTitle className="text-sm font-medium text-gray-600">
-              Total Resumes
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-purple-600">
-              {analytics.resumeAnalytics?.totalResumes || 0}
-            </div>
-          </CardContent>
-        </Card> */}
-
-        {/* <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-medium text-gray-600">
-              Resume Score
+              Latest Resume Score
             </CardTitle>
           </CardHeader>
           <CardContent>
             <div
               className={`text-2xl font-bold ${getScoreColor(
-                analytics.resumeAnalytics?.averageResumeScore || 0
+                analytics.resumeAnalytics?.recentResumes?.[0]?.score || 0
               )}`}
             >
-              {(analytics.resumeAnalytics?.averageResumeScore || 0) > 0
-                ? (analytics.resumeAnalytics?.averageResumeScore || 0).toFixed(
-                    1
-                  ) + "%"
+              {analytics.resumeAnalytics?.recentResumes?.[0]?.score
+                ? analytics.resumeAnalytics.recentResumes[0].score.toFixed(1) +
+                  "%"
                 : "N/A"}
             </div>
           </CardContent>
-        </Card> */}
+        </Card>
       </div>
 
       {/* Recent Interviews and Skills Analysis */}
@@ -262,41 +538,62 @@ export default function Analytics() {
           <CardContent>
             <div className="space-y-4">
               {(analytics.recentInterviews || []).length > 0 ? (
-                analytics.recentInterviews.map((interview) => (
-                  <div
-                    key={interview.id}
-                    className="flex items-center justify-between p-3 bg-gray-50 rounded-lg"
-                  >
-                    <div>
-                      <p className="font-medium">
-                        {interview.jdData?.jobRole || "Interview Session"}
-                      </p>
-                      <p className="text-sm text-gray-600">
-                        {new Date(interview.startedAt).toLocaleDateString()}
-                      </p>
-                    </div>
-                    <div className="text-right">
-                      <p
-                        className={`font-bold ${getScoreColor(
-                          interview.score || 0
-                        )}`}
+                <>
+                  {analytics.recentInterviews
+                    .slice(0, showAllInterviews ? undefined : 3)
+                    .map((interview) => (
+                      <div
+                        key={interview.id}
+                        className="flex items-center justify-between p-3 bg-gray-50 rounded-lg"
                       >
-                        {interview.score?.toFixed(1) || "N/A"}%
-                      </p>
-                      <span
-                        className={`inline-block px-2 py-1 text-xs rounded-full ${
-                          interview.status === "COMPLETED"
-                            ? "bg-green-100 text-green-800"
-                            : interview.status === "ACTIVE"
-                            ? "bg-blue-100 text-blue-800"
-                            : "bg-red-100 text-red-800"
-                        }`}
-                      >
-                        {interview.status}
-                      </span>
-                    </div>
-                  </div>
-                ))
+                        <div>
+                          <p className="font-medium">
+                            {interview.jdData?.title || "Interview Session"}
+                          </p>
+                          <p className="text-sm text-gray-600">
+                            {new Date(interview.startedAt).toLocaleDateString()}
+                          </p>
+                        </div>
+                        <div className="text-right">
+                          <p
+                            className={`font-bold ${getScoreColor(
+                              interview.score || 0
+                            )}`}
+                          >
+                            {interview.score?.toFixed(1) || "N/A"}%
+                          </p>
+                          <span
+                            className={`inline-block px-2 py-1 text-xs rounded-full ${
+                              interview.status === "COMPLETED"
+                                ? "bg-green-100 text-green-800"
+                                : interview.status === "ACTIVE"
+                                ? "bg-blue-100 text-blue-800"
+                                : "bg-red-100 text-red-800"
+                            }`}
+                          >
+                            {interview.status}
+                          </span>
+                        </div>
+                      </div>
+                    ))}
+                  {analytics.recentInterviews.length > 5 && (
+                    <Button
+                      variant="ghost"
+                      className="w-full mt-2 text-blue-600 hover:text-blue-800"
+                      onClick={() => setShowAllInterviews(!showAllInterviews)}
+                    >
+                      {showAllInterviews ? (
+                        <div className="flex items-center justify-center gap-2">
+                          Show Less <ChevronUpIcon />
+                        </div>
+                      ) : (
+                        <div className="flex items-center justify-center gap-2">
+                          View All <ChevronDownIcon />
+                        </div>
+                      )}
+                    </Button>
+                  )}
+                </>
               ) : (
                 <p className="text-gray-500 text-center py-4">
                   No interviews completed yet
@@ -306,42 +603,18 @@ export default function Analytics() {
           </CardContent>
         </Card>
 
-        {/* Skills Analysis */}
+        {/* Domain-wise Improvement */}
         <Card>
           <CardHeader>
-            <CardTitle>Interview Skills Performance</CardTitle>
+            <CardTitle>Domain-wise Performance Improvement</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="space-y-4">
-              {(analytics.skillsAnalysis || []).length > 0 ? (
-                (analytics.skillsAnalysis || []).map((skill) => (
-                  <div key={skill.skill} className="space-y-2">
-                    <div className="flex justify-between">
-                      <span className="font-medium">{skill.skill}</span>
-                      <span
-                        className={`font-bold ${getScoreColor(
-                          skill.averageScore
-                        )}`}
-                      >
-                        {skill.averageScore.toFixed(1)}%
-                      </span>
-                    </div>
-                    <div className="w-full bg-gray-200 rounded-full h-2">
-                      <div
-                        className={`h-2 rounded-full ${getScoreProgress(
-                          skill.averageScore
-                        )}`}
-                        style={{ width: `${skill.averageScore}%` }}
-                      ></div>
-                    </div>
-                    <p className="text-xs text-gray-500">
-                      {skill.count} questions answered
-                    </p>
-                  </div>
-                ))
+            <div className="h-[300px]">
+              {(analytics.recentInterviews || []).length > 0 ? (
+                <DomainProgressChart interviews={analytics.recentInterviews} />
               ) : (
                 <p className="text-gray-500 text-center py-4">
-                  No skills data available yet
+                  No interview data available yet
                 </p>
               )}
             </div>
@@ -613,45 +886,6 @@ export default function Analytics() {
           </CardContent>
         </Card>
       )}
-
-      {/* Monthly Progress */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Monthly Progress</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
-            {(analytics.monthlyProgress || []).length > 0 ? (
-              (analytics.monthlyProgress || []).map((month) => (
-                <div
-                  key={month.month}
-                  className="flex items-center justify-between p-4 bg-gray-50 rounded-lg"
-                >
-                  <div>
-                    <p className="font-medium">{month.month}</p>
-                    <p className="text-sm text-gray-600">
-                      {month.interviews} interviews
-                    </p>
-                  </div>
-                  <div className="text-right">
-                    <p
-                      className={`font-bold ${getScoreColor(
-                        month.averageScore
-                      )}`}
-                    >
-                      {month.averageScore.toFixed(1)}% avg
-                    </p>
-                  </div>
-                </div>
-              ))
-            ) : (
-              <p className="text-gray-500 text-center py-4">
-                No monthly data available yet
-              </p>
-            )}
-          </div>
-        </CardContent>
-      </Card>
 
       {/* Action Items */}
       <Card className="mt-8">

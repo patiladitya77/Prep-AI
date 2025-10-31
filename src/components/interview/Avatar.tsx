@@ -47,18 +47,7 @@ const Avatar: React.FC<AvatarProps> = ({
       return;
     }
 
-    // Only play greeting audio for female avatars, skip for male
-    if (variant !== "professional_female") {
-      // For male avatars, just mark as greeted without audio
-      const timer = setTimeout(() => {
-        setHasGreeted(true);
-        onGreetingComplete?.();
-      }, 1000);
-
-      return () => {
-        if (timer) clearTimeout(timer);
-      };
-    }
+    // Always continue with audio regardless of avatar variant
 
     const hour = new Date().getHours();
 
@@ -134,60 +123,32 @@ const Avatar: React.FC<AvatarProps> = ({
       const u = new SpeechSynthesisUtterance(text);
       u.rate = 0.9;
 
-      // Select appropriate voice based on variant
+      // Always use female voice regardless of avatar variant
       const voices = window.speechSynthesis.getVoices();
-      // debug: available voices suppressed
-      // console.log(
-      //   "Available voices:",
-      //   voices.map((v) => ({ name: v.name, lang: v.lang }))
-      // );
 
-      if (variant === "professional_female") {
-        // Find female voice (look for female names or voices that include 'female')
-        const femaleVoice =
-          voices.find(
-            (voice) =>
-              voice.name.toLowerCase().includes("female") ||
-              voice.name.toLowerCase().includes("woman") ||
-              voice.name.toLowerCase().includes("zira") ||
-              voice.name.toLowerCase().includes("hazel") ||
-              voice.name.toLowerCase().includes("susan") ||
-              voice.name.toLowerCase().includes("samantha") ||
-              voice.name.toLowerCase().includes("cortana") ||
-              voice.name.toLowerCase().includes("eva")
-          ) ||
-          voices.find(
-            (voice) =>
-              voice.lang.startsWith("en") &&
-              !voice.name.toLowerCase().includes("male")
-          );
+      // Find female voice (look for female names or voices that include 'female')
+      const femaleVoice =
+        voices.find(
+          (voice) =>
+            voice.name.toLowerCase().includes("female") ||
+            voice.name.toLowerCase().includes("woman") ||
+            voice.name.toLowerCase().includes("zira") ||
+            voice.name.toLowerCase().includes("hazel") ||
+            voice.name.toLowerCase().includes("susan") ||
+            voice.name.toLowerCase().includes("samantha") ||
+            voice.name.toLowerCase().includes("cortana") ||
+            voice.name.toLowerCase().includes("eva")
+        ) ||
+        voices.find(
+          (voice) =>
+            voice.lang.startsWith("en") &&
+            !voice.name.toLowerCase().includes("male")
+        );
 
-        if (femaleVoice) {
-          u.voice = femaleVoice;
-          // console.log("Selected female voice:", femaleVoice.name);
-        } else {
-          // console.log("No female voice found, using default");
-        }
-        u.pitch = 1.3; // Higher pitch for female voice
-      } else {
-        // Find male voice
-        const maleVoice =
-          voices.find(
-            (voice) =>
-              voice.name.toLowerCase().includes("male") ||
-              voice.name.toLowerCase().includes("david") ||
-              voice.name.toLowerCase().includes("mark") ||
-              voice.name.toLowerCase().includes("daniel")
-          ) || voices.find((voice) => voice.lang.includes("en"));
-
-        if (maleVoice) {
-          u.voice = maleVoice;
-          // console.log("Selected male voice:", maleVoice.name);
-        } else {
-          // console.log("No male voice found, using default");
-        }
-        u.pitch = 0.8; // Lower pitch for male voice
+      if (femaleVoice) {
+        u.voice = femaleVoice;
       }
+      u.pitch = 1.3; // Higher pitch for female voice
 
       u.onstart = () => setIsSpeaking(true);
       u.onend = () => setIsSpeaking(false);

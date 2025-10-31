@@ -45,6 +45,15 @@ export default function GoalsPage() {
   } = useGoals();
 
   const [showAddGoal, setShowAddGoal] = useState(false);
+  const [deleteConfirmation, setDeleteConfirmation] = useState<{
+    isOpen: boolean;
+    goalId: string | null;
+    goalTitle: string;
+  }>({
+    isOpen: false,
+    goalId: null,
+    goalTitle: "",
+  });
   const [newGoal, setNewGoal] = useState({
     title: "",
     description: "",
@@ -52,29 +61,53 @@ export default function GoalsPage() {
     targetDate: "",
   });
 
-  const completedGoals = goals.filter((goal) => goal.completed).length;
-  const totalGoals = goals.length;
+  const activeGoals = goals.filter((goal) => {
+    const targetDate = new Date(goal.targetDate);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    return targetDate >= today || goal.completed;
+  });
+
+  const completedGoals = activeGoals.filter((goal) => goal.completed).length;
+  const totalGoals = activeGoals.length;
   const overallProgress =
     totalGoals > 0 ? (completedGoals / totalGoals) * 100 : 0;
 
   const handleAddGoal = async () => {
-    if (newGoal.title.trim() && newGoal.targetDate) {
-      try {
-        await createGoal(newGoal);
-        toast.success("Goal created successfully!");
-        setNewGoal({
-          title: "",
-          description: "",
-          category: "interview",
-          targetDate: "",
-        });
-        setShowAddGoal(false);
-      } catch (error) {
-        toast.error("Failed to create goal. Please try again.");
-        console.error("Error creating goal:", error);
-      }
-    } else {
-      toast.error("Please fill in all required fields.");
+    // Validate required fields
+    if (!newGoal.title.trim()) {
+      toast.error("Please enter a goal title.");
+      return;
+    }
+
+    if (!newGoal.targetDate) {
+      toast.error("Please select a target date.");
+      return;
+    }
+
+    // Validate target date
+    const targetDate = new Date(newGoal.targetDate);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    if (targetDate < today) {
+      toast.error("Target date cannot be in the past.");
+      return;
+    }
+
+    try {
+      await createGoal(newGoal);
+      toast.success("Goal created successfully!");
+      setNewGoal({
+        title: "",
+        description: "",
+        category: "interview",
+        targetDate: "",
+      });
+      setShowAddGoal(false);
+    } catch (error) {
+      toast.error("Failed to create goal. Please try again.");
+      console.error("Error creating goal:", error);
     }
   };
 
@@ -92,14 +125,27 @@ export default function GoalsPage() {
   };
 
   const handleDeleteGoal = async (id: string) => {
-    if (window.confirm("Are you sure you want to delete this goal?")) {
-      try {
-        await deleteGoal(id);
-        toast.success("Goal deleted successfully");
-      } catch (error) {
-        toast.error("Failed to delete goal. Please try again.");
-        console.error("Error deleting goal:", error);
-      }
+    const goal = goals.find((g) => g.id === id);
+    if (!goal) return;
+
+    setDeleteConfirmation({
+      isOpen: true,
+      goalId: id,
+      goalTitle: goal.title,
+    });
+  };
+
+  const confirmDelete = async () => {
+    if (!deleteConfirmation.goalId) return;
+
+    try {
+      await deleteGoal(deleteConfirmation.goalId);
+      toast.success("Goal deleted successfully");
+    } catch (error) {
+      toast.error("Failed to delete goal. Please try again.");
+      console.error("Error deleting goal:", error);
+    } finally {
+      setDeleteConfirmation({ isOpen: false, goalId: null, goalTitle: "" });
     }
   };
 
@@ -181,9 +227,9 @@ export default function GoalsPage() {
 
               <button
                 onClick={() => setShowAddGoal(true)}
-                className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors"
+                className="flex items-center gap-2 px-4 py-2 bg-black text-white rounded-lg text-sm font-medium hover:bg-black hover:cursor-pointer transition-colors"
               >
-                <Plus className="w-4 h-4" />
+                <Plus className="w-4 h-4 text-white" />
                 Add Goal
               </button>
             </div>
@@ -342,7 +388,7 @@ export default function GoalsPage() {
               </p>
               <button
                 onClick={() => setShowAddGoal(true)}
-                className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors"
+                className="px-4 py-2 bg-black text-white rounded-lg text-sm font-medium hover:cursor-pointer transition-colors"
               >
                 Add Your First Goal
               </button>
@@ -353,8 +399,8 @@ export default function GoalsPage() {
 
       {/* Add Goal Modal */}
       {showAddGoal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-lg w-full max-w-md">
+        <div className="fixed inset-0 bg-black/25 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-lg w-full max-w-md shadow-xl">
             <div className="p-6">
               <h2 className="text-lg font-bold text-gray-900 mb-4">
                 Add New Goal
@@ -419,9 +465,18 @@ export default function GoalsPage() {
                   <input
                     type="date"
                     value={newGoal.targetDate}
-                    onChange={(e) =>
-                      setNewGoal({ ...newGoal, targetDate: e.target.value })
-                    }
+                    min={new Date().toISOString().split("T")[0]}
+                    onChange={(e) => {
+                      const selectedDate = new Date(e.target.value);
+                      const today = new Date();
+                      today.setHours(0, 0, 0, 0);
+
+                      if (selectedDate < today) {
+                        toast.error("Target date cannot be in the past");
+                        return;
+                      }
+                      setNewGoal({ ...newGoal, targetDate: e.target.value });
+                    }}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                   />
                 </div>
@@ -446,6 +501,47 @@ export default function GoalsPage() {
         </div>
       )}
       <Toaster position="top-right" />
+
+      {/* Delete Confirmation Dialog */}
+      {deleteConfirmation.isOpen && (
+        <div className="fixed inset-0 bg-black/25 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-lg w-full max-w-md shadow-xl">
+            <div className="p-6">
+              <h2 className="text-xl font-bold text-gray-900 mb-4">
+                Delete Goal
+              </h2>
+              <div className="mb-6">
+                <p className="text-gray-600">
+                  Are you sure you want to delete this goal?
+                </p>
+                <p className="mt-2 font-medium text-gray-900">
+                  "{deleteConfirmation.goalTitle}"
+                </p>
+              </div>
+              <div className="flex items-center gap-3 justify-end">
+                <button
+                  onClick={() =>
+                    setDeleteConfirmation({
+                      isOpen: false,
+                      goalId: null,
+                      goalTitle: "",
+                    })
+                  }
+                  className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-50 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={confirmDelete}
+                  className="px-4 py-2 bg-red-600 text-white rounded-lg text-sm font-medium hover:bg-red-700 transition-colors"
+                >
+                  Delete Goal
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
