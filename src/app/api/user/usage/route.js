@@ -22,7 +22,6 @@ export async function GET(request) {
       select: {
         isPremium: true,
         interviewAttempts: true,
-        resumeChecks: true,
       },
     });
 
@@ -30,9 +29,13 @@ export async function GET(request) {
       return NextResponse.json({ error: "User not found" }, { status: 404 });
     }
 
-    // Get actual usage from user counters
+    // Get user's interview attempts from the counter
     const interviewCount = user.interviewAttempts || 0;
-    const resumeCount = user.resumeChecks || 0;
+
+    // Get user's resume analysis count (how many times they checked their resume)
+    const resumeCount = await prisma.resumeAnalysis.count({
+      where: { userId: userId },
+    });
 
     // Define limits based on premium status
     let limits;

@@ -75,9 +75,13 @@ export async function POST(request) {
       );
     }
 
+    // Count how many times user has analyzed resumes
+    const resumesUsed = await prisma.resumeAnalysis.count({
+      where: { userId: decoded.userId },
+    });
+
     // Get usage limits based on user type
     const resumeLimit = user.isPremium ? 100 : 10;
-    const resumesUsed = user.resumeChecks || 0;
 
     // Check if user has reached their resume check limit
     if (resumesUsed >= resumeLimit) {
@@ -204,16 +208,7 @@ Please ensure all scores are realistic and constructive. Provide specific, actio
               jobDescription: jobDescription || null,
             },
           });
-
-          // Increment user's resume check count
-          await prisma.user.update({
-            where: { id: decoded.userId },
-            data: {
-              resumeChecks: {
-                increment: 1,
-              },
-            },
-          });
+          // Count is tracked automatically by resumeAnalysis records
         } catch (dbError) {
           console.error("Text Database storage error:", dbError);
         }
@@ -374,16 +369,7 @@ Please ensure all scores are realistic and constructive. Provide specific, actio
               jobDescription: jobDescription || null,
             },
           });
-
-          // Increment user's resume check count
-          await prisma.user.update({
-            where: { id: decoded.userId },
-            data: {
-              resumeChecks: {
-                increment: 1,
-              },
-            },
-          });
+          // Count is tracked automatically by resumeAnalysis records
         } catch (dbError) {
           console.error("PDF Database storage error:", dbError);
         }
