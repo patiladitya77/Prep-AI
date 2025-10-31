@@ -155,7 +155,7 @@ export default function SignUp() {
                 "Create account"
               )}
             </button>
-            <button
+            {/* <button
               type="button"
               disabled={isLoading}
               onClick={() => {
@@ -166,7 +166,7 @@ export default function SignUp() {
               suppressHydrationWarning
             >
               Continue with Google
-            </button>
+            </button> */}
           </div>
 
           <p className="text-center text-sm mt-2">

@@ -161,7 +161,7 @@ export default function Login() {
                 "Login"
               )}
             </button>
-            <button
+            {/* <button
               type="button"
               disabled={isLoading}
               onClick={() => {
@@ -172,7 +172,7 @@ export default function Login() {
               suppressHydrationWarning
             >
               Continue with Google
-            </button>
+            </button> */}
           </div>
 
           <p className="text-center text-sm mt-4">
