@@ -63,6 +63,38 @@ export async function POST(request) {
       );
     }
 
+    // Check user's resume analysis usage limits
+    const user = await prisma.user.findUnique({
+      where: { id: decoded.userId },
+    });
+
+    if (!user) {
+      return NextResponse.json(
+        { error: "User not found" },
+        { status: 404 }
+      );
+    }
+
+    // Get usage limits based on user type
+    const resumeLimit = user.isPremium ? 100 : 10;
+    const resumesUsed = user.resumeChecks || 0;
+
+    // Check if user has reached their resume check limit
+    if (resumesUsed >= resumeLimit) {
+      return NextResponse.json(
+        { 
+          error: "Resume check limit reached",
+          message: user.isPremium 
+            ? "You have exhausted your premium resume check limit"
+            : "You have reached your resume check limit. Please upgrade to continue.",
+          limitReached: true,
+          used: resumesUsed,
+          limit: resumeLimit
+        },
+        { status: 403 }
+      );
+    }
+
     // Parse the form data
     const formData = await request.formData();
     const resumeFile = formData.get("resume");
@@ -170,6 +202,16 @@ Please ensure all scores are realistic and constructive. Provide specific, actio
               suggestions: analysis.suggestions,
               extractedText: resumeText.substring(0, 2000),
               jobDescription: jobDescription || null,
+            },
+          });
+
+          // Increment user's resume check count
+          await prisma.user.update({
+            where: { id: decoded.userId },
+            data: {
+              resumeChecks: {
+                increment: 1,
+              },
             },
           });
         } catch (dbError) {
@@ -330,6 +372,16 @@ Please ensure all scores are realistic and constructive. Provide specific, actio
               suggestions: analysis.suggestions,
               extractedText: resumeText.substring(0, 2000),
               jobDescription: jobDescription || null,
+            },
+          });
+
+          // Increment user's resume check count
+          await prisma.user.update({
+            where: { id: decoded.userId },
+            data: {
+              resumeChecks: {
+                increment: 1,
+              },
             },
           });
         } catch (dbError) {

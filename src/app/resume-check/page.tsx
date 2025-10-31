@@ -1,7 +1,9 @@
 "use client";
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import toast from "react-hot-toast";
+import { useUsageStats } from "@/hooks/useUsageStats";
+import { useAuth } from "@/context/AuthContext";
 
 interface AnalysisResult {
   overallScore: number;
@@ -19,6 +21,8 @@ interface AnalysisResult {
 
 export default function ResumeCheckPage() {
   const router = useRouter();
+  const { usage } = useUsageStats();
+  const { user } = useAuth();
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [analysisResult, setAnalysisResult] = useState<AnalysisResult | null>(
     null
@@ -26,6 +30,23 @@ export default function ResumeCheckPage() {
   const [jobDescription, setJobDescription] = useState("");
   const [dragActive, setDragActive] = useState(false);
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
+
+  // Check resume limit on mount
+  useEffect(() => {
+    if (usage) {
+      const isResumeLimitReached = usage.resumes.used >= usage.resumes.limit;
+      
+      if (isResumeLimitReached) {
+        toast.error("Resume check limit reached! Redirecting to pricing...", {
+          id: "resume-limit-redirect",
+        });
+        setTimeout(() => {
+          router.push("/pricing");
+        }, 1500);
+        return;
+      }
+    }
+  }, [usage, router]);
 
   const handleDrag = (e: React.DragEvent) => {
     e.preventDefault();
@@ -70,6 +91,19 @@ export default function ResumeCheckPage() {
   };
 
   const handleAnalyzeResume = async () => {
+    // Check resume limit before analyzing
+    if (usage) {
+      const isResumeLimitReached = usage.resumes.used >= usage.resumes.limit;
+      
+      if (isResumeLimitReached) {
+        toast.error("Resume check limit reached! Please upgrade to continue.", {
+          id: "resume-limit",
+        });
+        router.push("/pricing");
+        return;
+      }
+    }
+
     if (!uploadedFile) {
       toast.error(" Please upload a resume first");
       return;
@@ -98,9 +132,17 @@ export default function ResumeCheckPage() {
         setAnalysisResult(data.analysis);
         toast.success(" Resume analysis completed!", { id: "analyzing" });
       } else {
-        toast.error("❌ " + (data.error || "Analysis failed"), {
-          id: "analyzing",
-        });
+        // Check if it's a limit reached error
+        if (data.limitReached || response.status === 403) {
+          toast.error(data.message || "Resume check limit reached! Please upgrade to continue.", {
+            id: "analyzing",
+          });
+          router.push("/pricing");
+        } else {
+          toast.error("❌ " + (data.error || "Analysis failed"), {
+            id: "analyzing",
+          });
+        }
       }
     } catch (error) {
       console.error("Analysis error:", error);
