@@ -16,7 +16,7 @@ export default function SignUp() {
     e.preventDefault();
     setIsLoading(true);
     setErrorMessage("");
-    toast.loading("📝 Creating your account...", { id: "signup-progress" });
+    toast.loading("Creating your account...", { id: "signup-progress" });
 
     try {
       const response = await fetch("/api/auth/signup", {

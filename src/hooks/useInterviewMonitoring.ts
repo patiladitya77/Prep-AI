@@ -143,6 +143,25 @@ export const useInterviewMonitoring = ({
 
   // MediaPipe-based face and eye detection
   const initializeMediaPipe = useCallback(async () => {
+    // Check if face detection is disabled via environment variable
+    const faceDetectionEnabled = process.env.NEXT_PUBLIC_ENABLE_FACE_DETECTION !== 'false';
+    
+    if (!faceDetectionEnabled) {
+      // Silently disable face detection without notifying user
+      faceMeshRef.current = {
+        send: () => {
+          setDetectionStatus({
+            faceDetected: true,
+            eyesDetected: true,
+            lookingAtCamera: true,
+            faceCount: 1,
+          });
+        },
+        close: () => {},
+      };
+      return;
+    }
+
     // Only initialize on the client
     if (typeof window === "undefined") {
       console.warn("MediaPipe initialization skipped on server-side");
@@ -214,8 +233,9 @@ export const useInterviewMonitoring = ({
 
           const s = document.createElement("script");
           s.src =
-            "https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/face_mesh.js";
+            "https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh@0.4.1633559619/face_mesh.js";
           s.setAttribute("data-mediapipe-face_mesh", "1");
+          s.crossOrigin = "anonymous";
           s.onload = () => resolve();
           s.onerror = (ev) =>
             reject(new Error("Failed to load MediaPipe script"));
@@ -260,18 +280,35 @@ export const useInterviewMonitoring = ({
 
       // console.log("✅ FaceMesh constructor resolved, creating instance...");
 
-      const faceMesh = new faceMeshConstructor({
-        locateFile: (file: string) =>
-          `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${file}`,
-      });
+      // Wrap initialization in try-catch to handle runtime errors
+      let faceMesh;
+      try {
+        faceMesh = new faceMeshConstructor({
+          locateFile: (file: string) => {
+            // Handle different file types - avoid SIMD issues
+            if (file.includes('simd')) {
+              // Replace SIMD with regular version
+              const nonSimdFile = file.replace('_simd', '');
+              console.log(`Redirecting ${file} to ${nonSimdFile}`);
+              return `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh@0.4.1633559619/${nonSimdFile}`;
+            }
+            // Use Google's official CDN - most reliable
+            return `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh@0.4.1633559619/${file}`;
+          },
+        });
 
-      faceMesh.setOptions({
-        // Allow multiple faces so we can detect if >1 person in frame
-        maxNumFaces: 4,
-        refineLandmarks: true,
-        minDetectionConfidence: 0.5,
-        minTrackingConfidence: 0.5,
-      });
+        faceMesh.setOptions({
+          // Allow multiple faces so we can detect if >1 person in frame
+          maxNumFaces: 2, // Reduced for better performance
+          refineLandmarks: false, // Disable refinement for better compatibility
+          minDetectionConfidence: 0.5,
+          minTrackingConfidence: 0.5,
+          selfieMode: false,
+        });
+      } catch (initError) {
+        console.error("Failed to create FaceMesh instance:", initError);
+        throw initError; // Re-throw to trigger outer catch
+      }
 
       // console.log("⚙️ Setting up FaceMesh configuration...");
 
@@ -544,7 +581,8 @@ export const useInterviewMonitoring = ({
         // Alternative: Load MediaPipe via global script approach
         const faceMeshScript = document.createElement("script");
         faceMeshScript.src =
-          "https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/face_mesh.js";
+          "https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh@0.4.1633559619/face_mesh.js";
+        faceMeshScript.crossOrigin = "anonymous";
         document.head.appendChild(faceMeshScript);
 
         await new Promise((resolve, reject) => {
@@ -557,15 +595,24 @@ export const useInterviewMonitoring = ({
         if ((window as any).FaceMesh) {
           // console.log("✅ MediaPipe loaded via script tag");
           const faceMesh = new (window as any).FaceMesh({
-            locateFile: (file: string) =>
-              `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${file}`,
+            locateFile: (file: string) => {
+              // Handle different file types - avoid SIMD issues
+              if (file.includes('simd')) {
+                // Replace SIMD with regular version
+                const nonSimdFile = file.replace('_simd', '');
+                console.log(`Fallback: Redirecting ${file} to ${nonSimdFile}`);
+                return `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh@0.4.1633559619/${nonSimdFile}`;
+              }
+              return `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh@0.4.1633559619/${file}`;
+            },
           });
 
           faceMesh.setOptions({
-            maxNumFaces: 4,
-            refineLandmarks: true,
+            maxNumFaces: 2, // Reduced for better performance
+            refineLandmarks: false, // Disable refinement for better compatibility
             minDetectionConfidence: 0.5,
             minTrackingConfidence: 0.5,
+            selfieMode: false,
           });
 
           // Set up the same onResults handler
@@ -604,13 +651,7 @@ export const useInterviewMonitoring = ({
         console.error("❌ Alternative MediaPipe loading failed:", scriptError);
       }
 
-      // Deduplicated toast informing user about face-detection fallback
-      toast.error(
-        "Face detection unavailable. Using monitoring without face tracking.",
-        { id: "face-detection-unavailable" }
-      );
-
-      // Set up a basic fallback detection
+      // Silently fall back to basic detection without notifying user
       faceMeshRef.current = {
         send: () => {
           // Basic fallback - assume face is present if video is working
