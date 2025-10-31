@@ -144,6 +144,16 @@ async function POST(request) {
         },
       });
 
+      // Increment user's interview attempt count
+      await prisma.user.update({
+        where: { id: userId },
+        data: {
+          interviewAttempts: {
+            increment: 1,
+          },
+        },
+      });
+
       // Automatically trigger question generation
       console.log("🧩 Generating questions with data:", {
         sessionId: interviewSession.id,

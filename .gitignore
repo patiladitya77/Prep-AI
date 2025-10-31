@@ -20,6 +20,12 @@
 # production
 /build
 
+awscliv2.zip
+aws 
+terraform
+lambda_function.py
+function.zip
+trust-policy.json
 # misc
 .DS_Store
 *.pem

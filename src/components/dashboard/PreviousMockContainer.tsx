@@ -10,6 +10,8 @@ import {
   invalidateInterviewCache,
   isCacheValid,
 } from "@/utils/interviewCache";
+import { useUsageStats } from "@/hooks/useUsageStats";
+import { useAuth } from "@/context/AuthContext";
 
 interface Interview {
   id: string;
@@ -28,6 +30,8 @@ const PreviousMockContainer = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const router = useRouter();
+  const { usage } = useUsageStats();
+  const { user } = useAuth();
   // prevent duplicate reattempt submissions per interview id
   const reattemptingRef = useRef<Record<string, boolean>>({});
 
@@ -120,9 +124,25 @@ const PreviousMockContainer = () => {
     try {
       if (reattemptingRef.current[interviewId]) return;
       reattemptingRef.current[interviewId] = true;
+
+      // Check interview limit before reattempting
+      if (usage) {
+        const isInterviewLimitReached = usage.interviews.used >= usage.interviews.limit;
+        
+        if (isInterviewLimitReached) {
+          toast.error("Interview limit reached! Please upgrade to continue.", {
+            id: "interview-limit-reattempt",
+          });
+          delete reattemptingRef.current[interviewId];
+          router.push("/pricing");
+          return;
+        }
+      }
+
       const token = localStorage.getItem("authToken");
       if (!token) {
         toast.error(" Please login to re-attempt interview");
+        delete reattemptingRef.current[interviewId];
         return;
       }
 
@@ -168,10 +188,19 @@ const PreviousMockContainer = () => {
           delete reattemptingRef.current[interviewId];
         }, 3000);
       } else {
-        toast.error(` ${data.error || "Failed to re-attempt interview"}`, {
-          id: `reattempt-error-${interviewId}`,
-        });
-        delete reattemptingRef.current[interviewId];
+        // Check if it's a limit reached error
+        if (data.limitReached || response.status === 403) {
+          toast.error(data.message || "Interview limit reached! Please upgrade to continue.", {
+            id: `reattempt-limit-${interviewId}`,
+          });
+          delete reattemptingRef.current[interviewId];
+          router.push("/pricing");
+        } else {
+          toast.error(` ${data.error || "Failed to re-attempt interview"}`, {
+            id: `reattempt-error-${interviewId}`,
+          });
+          delete reattemptingRef.current[interviewId];
+        }
       }
     } catch (error) {
       console.error("Error re-attempting interview:", error);

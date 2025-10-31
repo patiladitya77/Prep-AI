@@ -63,6 +63,42 @@ export async function POST(request) {
       );
     }
 
+    // Check user's resume analysis usage limits
+    const user = await prisma.user.findUnique({
+      where: { id: decoded.userId },
+    });
+
+    if (!user) {
+      return NextResponse.json(
+        { error: "User not found" },
+        { status: 404 }
+      );
+    }
+
+    // Count how many times user has analyzed resumes
+    const resumesUsed = await prisma.resumeAnalysis.count({
+      where: { userId: decoded.userId },
+    });
+
+    // Get usage limits based on user type
+    const resumeLimit = user.isPremium ? 100 : 10;
+
+    // Check if user has reached their resume check limit
+    if (resumesUsed >= resumeLimit) {
+      return NextResponse.json(
+        { 
+          error: "Resume check limit reached",
+          message: user.isPremium 
+            ? "You have exhausted your premium resume check limit"
+            : "You have reached your resume check limit. Please upgrade to continue.",
+          limitReached: true,
+          used: resumesUsed,
+          limit: resumeLimit
+        },
+        { status: 403 }
+      );
+    }
+
     // Parse the form data
     const formData = await request.formData();
     const resumeFile = formData.get("resume");
@@ -172,6 +208,7 @@ Please ensure all scores are realistic and constructive. Provide specific, actio
               jobDescription: jobDescription || null,
             },
           });
+          // Count is tracked automatically by resumeAnalysis records
         } catch (dbError) {
           console.error("Text Database storage error:", dbError);
         }
@@ -332,6 +369,7 @@ Please ensure all scores are realistic and constructive. Provide specific, actio
               jobDescription: jobDescription || null,
             },
           });
+          // Count is tracked automatically by resumeAnalysis records
         } catch (dbError) {
           console.error("PDF Database storage error:", dbError);
         }

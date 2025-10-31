@@ -20,9 +20,8 @@ export async function GET(request) {
     const user = await prisma.user.findUnique({
       where: { id: userId },
       select: {
-
         isPremium: true,
-
+        interviewAttempts: true,
       },
     });
 
@@ -30,28 +29,25 @@ export async function GET(request) {
       return NextResponse.json({ error: "User not found" }, { status: 404 });
     }
 
+    // Get user's interview attempts from the counter
+    const interviewCount = user.interviewAttempts || 0;
 
-    // Get user's interview sessions count
-    const interviewCount = await prisma.interviewSession.count({
+    // Get user's resume analysis count (how many times they checked their resume)
+    const resumeCount = await prisma.resumeAnalysis.count({
       where: { userId: userId },
     });
 
-    // Get user's resume count
-    const resumeCount = await prisma.resume.count({
-      where: { userId: userId },
-    });
-
-    // Define limits (you can make these configurable)
+    // Define limits based on premium status
     let limits;
     if (user.isPremium) {
       limits = {
-        interviews: 10,
-        resumes: 20
+        interviews: 50,
+        resumes: 100
       }
     } else {
       limits = {
-        interviews: 4,
-        resumes: 6,
+        interviews: 5,
+        resumes: 10,
       };
     }
 
