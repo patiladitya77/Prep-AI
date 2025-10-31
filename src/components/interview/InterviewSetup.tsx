@@ -10,6 +10,8 @@ import toast from "react-hot-toast";
 import { ButtonLoading } from "../ui/Loading";
 import Loading from "../ui/Loading";
 import { invalidateInterviewCache } from "@/utils/interviewCache";
+import { useUsageStats } from "@/hooks/useUsageStats";
+import { useAuth } from "@/context/AuthContext";
 
 interface InterviewSetupProps {
   interviewId?: string;
@@ -17,6 +19,8 @@ interface InterviewSetupProps {
 
 const InterviewSetup: React.FC<InterviewSetupProps> = ({ interviewId }) => {
   const router = useRouter();
+  const { usage } = useUsageStats();
+  const { user } = useAuth();
   const [currentStep, setCurrentStep] = useState(1);
   const [loading, setLoading] = useState(false);
   const [creatingInterview, setCreatingInterview] = useState(false);
@@ -33,6 +37,23 @@ const InterviewSetup: React.FC<InterviewSetupProps> = ({ interviewId }) => {
   // Guard refs to prevent double submission/navigation
   const isSubmittingRef = useRef(false);
   const navigatedRef = useRef(false);
+
+  // Check interview limit on mount
+  useEffect(() => {
+    if (usage && !interviewId) {
+      const isInterviewLimitReached = usage.interviews.used >= usage.interviews.limit;
+      
+      if (isInterviewLimitReached) {
+        toast.error("Interview limit reached! Redirecting to pricing...", {
+          id: "interview-limit-redirect",
+        });
+        setTimeout(() => {
+          router.push("/pricing");
+        }, 1500);
+        return;
+      }
+    }
+  }, [usage, interviewId, router]);
 
   useEffect(() => {
     fetchExistingResumes();
@@ -125,6 +146,19 @@ const InterviewSetup: React.FC<InterviewSetupProps> = ({ interviewId }) => {
   };
 
   const handleCreateInterview = async () => {
+    // Check interview limit before creating
+    if (usage && !interviewId) {
+      const isInterviewLimitReached = usage.interviews.used >= usage.interviews.limit;
+      
+      if (isInterviewLimitReached) {
+        toast.error("Interview limit reached! Please upgrade to continue.", {
+          id: "interview-limit",
+        });
+        router.push("/pricing");
+        return;
+      }
+    }
+
     // Prevent double submission/navigation
     if (isSubmittingRef.current) return;
     isSubmittingRef.current = true;

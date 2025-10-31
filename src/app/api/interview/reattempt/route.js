@@ -29,6 +29,38 @@ async function POST(request) {
 
     const userId = decoded.userId;
 
+    // Check user's interview usage limits
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+    });
+
+    if (!user) {
+      return NextResponse.json(
+        { error: "User not found" },
+        { status: 404 }
+      );
+    }
+
+    // Get usage limits based on user type
+    const interviewLimit = user.isPremium ? 50 : 5;
+    const interviewsUsed = user.interviewAttempts || 0;
+
+    // Check if user has reached their interview limit
+    if (interviewsUsed >= interviewLimit) {
+      return NextResponse.json(
+        { 
+          error: "Interview limit reached",
+          message: user.isPremium 
+            ? "You have exhausted your premium interview limit"
+            : "You have reached your interview limit. Please upgrade to continue.",
+          limitReached: true,
+          used: interviewsUsed,
+          limit: interviewLimit
+        },
+        { status: 403 }
+      );
+    }
+
     // Parse the request body
     const body = await request.json();
     const { originalSessionId } = body;

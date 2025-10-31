@@ -1,10 +1,32 @@
 "use client";
 import Link from "next/link";
 import UsageProgress from "../dashboard/UsageProgress";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
+import { useUsageStats } from "@/hooks/useUsageStats";
+import { useAuth } from "@/context/AuthContext";
+import toast from "react-hot-toast";
 
 export default function Sidebar() {
   const pathName = usePathname();
+  const router = useRouter();
+  const { usage } = useUsageStats();
+  const { user } = useAuth();
+
+  const handleInterviewClick = (e: React.MouseEvent) => {
+    if (!usage) return;
+
+    const isInterviewLimitReached = usage.interviews.used >= usage.interviews.limit;
+
+    if (isInterviewLimitReached) {
+      e.preventDefault();
+      toast.error("Interview limit reached! Please upgrade to continue.", {
+        id: "interview-limit",
+      });
+      router.push("/pricing");
+      return;
+    }
+  };
+
   return (
     <div className="p-4 space-y-6 text-gray-700 text-sm bg-slate-100 rounded-lg m-2 ">
       <div className="mb-10">
@@ -13,7 +35,7 @@ export default function Sidebar() {
         </div>
         <ul className="space-y-2">
           <li className="hover:bg-gray-100 px-2 py-1 rounded">
-            <Link href="/home/dashboard">
+            <Link href="/home/dashboard" onClick={handleInterviewClick}>
               <div
                 className={`flex py-2 rounded-md cursor-pointer 
           ${
@@ -158,13 +180,16 @@ export default function Sidebar() {
         <div className="text-gray-500 uppercase text-xs mb-2">Usage</div>
         <ul>
           <li className="hover:bg-gray-100 px-2 py-1 rounded ">
-            {/* <p>Interviews</p> */}
-            <UsageProgress
-              interviewsUsed={1}
-              interviewLimit={4}
-              resumeChecksUsed={4}
-              resumeCheckLimit={6}
-            />
+            {usage ? (
+              <UsageProgress
+                interviewsUsed={usage.interviews.used}
+                interviewLimit={usage.interviews.limit}
+                resumeChecksUsed={usage.resumes.used}
+                resumeCheckLimit={usage.resumes.limit}
+              />
+            ) : (
+              <p className="text-xs text-gray-500">Loading usage...</p>
+            )}
           </li>
         </ul>
         <p className="text-xs text-gray-500 my-1 mx-2">
@@ -172,9 +197,11 @@ export default function Sidebar() {
         </p>
       </div>
       <div>
-        <button className="bg-black rounded-md w-full h-10 text-white">
-          Get Pro
-        </button>
+        <Link href="/pricing">
+          <button className="bg-black rounded-md w-full h-10 text-white hover:bg-gray-800 transition-colors">
+            Get Pro
+          </button>
+        </Link>
       </div>
     </div>
   );
