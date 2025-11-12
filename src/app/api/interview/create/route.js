@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { PrismaClient } from "@prisma/client";
 import jwt from "jsonwebtoken"
+import generateInterviewQuestions from "../../../../services/questionGeneration";
 
 
 const prisma = new PrismaClient();
@@ -144,42 +145,37 @@ async function POST(request) {
         },
       });
 
-      // Automatically trigger question generation
-      console.log("🧩 Generating questions with data:", {
-        sessionId: interviewSession.id,
-        jobRole,
-        jobDescription,
-        experienceLevel: expYears,
-      });
+
 
       try {
-        const questionGenerationResponse = await fetch(
-          `${process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000"
-          }/api/interview/generate-questions`,
-          {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              Authorization: `Bearer ${token}`,
-            },
-            body: JSON.stringify({
-              sessionId: interviewSession.id,
-              jobDescription: jobDescription,
-              experienceLevel: expYears,
-              jobRole: jobRole,
-            }),
-          }
-        );
+        // const questionGenerationResponse = await fetch(
+        //   `${process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000"
+        //   }/api/interview/generate-questions`,
+        //   {
+        //     method: "POST",
+        //     headers: {
+        //       "Content-Type": "application/json",
+        //       Authorization: `Bearer ${token}`,
+        //     },
+        //     body: JSON.stringify({
+        //       sessionId: interviewSession.id,
+        //       jobDescription: jobDescription,
+        //       experienceLevel: expYears,
+        //       jobRole: jobRole,
+        //     }),
+        //   }
+        // );
+        const questionGenerationResponse = await generateInterviewQuestions(interviewSession.id, jobDescription, expYears, jobRole, userId);
 
         // if (!questionGenerationResponse.ok) {
         //   console.error("Failed to generate questions automatically");
         // }
-        const questionData = await questionGenerationResponse.json();
-        if (!questionGenerationResponse.ok) {
-          console.error("Failed to generate questions automatically:", questionData);
-        } else {
-          console.log("✅ Questions generated successfully:", questionData?.questions?.length || 0);
-        }
+        // const questionData = await questionGenerationResponse.json();
+        // if (!questionGenerationResponse.ok) {
+        //   console.error("Failed to generate questions automatically:", questionData);
+        // } else {
+        //   console.log("✅ Questions generated successfully:", questionData?.questions?.length || 0);
+        // }
 
       } catch (questionError) {
         console.error("Error generating questions:", questionError);
