@@ -1,12 +1,10 @@
-import { NextResponse } from "next/server";
-import { PrismaClient } from "@prisma/client";
+import { NextRequest, NextResponse } from "next/server";
 import { generateToken, hashPassword } from "@/lib/auth/helpers";
 import crypto from "crypto";
 
+import { prisma } from "../../../../../lib/prisma";
 
-const prisma = new PrismaClient();
-
-async function GET(request) {
+async function GET(request: NextRequest) {
   try {
     const url = new URL(request.url);
     const code = url.searchParams.get("code");
@@ -18,8 +16,8 @@ async function GET(request) {
       );
     }
 
-    const clientId = process.env.GOOGLE_CLIENT_ID;
-    const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
+    const clientId = process.env.GOOGLE_CLIENT_ID!;
+    const clientSecret = process.env.GOOGLE_CLIENT_SECRET!;
     const baseUrl =
       process.env.NEXT_PUBLIC_BASE_URL ||
       process.env.BASE_URL ||

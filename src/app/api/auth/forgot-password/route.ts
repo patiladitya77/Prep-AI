@@ -1,12 +1,9 @@
-import { NextResponse } from "next/server";
-import { PrismaClient } from "@prisma/client";
+import { NextRequest, NextResponse } from "next/server";
+import { prisma } from "../../../../lib/prisma";
 import { validateEmail } from "@/lib/auth/helpers";
 import crypto from "crypto";
 
-
-const prisma = new PrismaClient();
-
-async function POST(request) {
+async function POST(request: NextRequest) {
   try {
     const body = await request.json();
     const { email } = body;
@@ -48,10 +45,11 @@ async function POST(request) {
         },
       });
 
-      const resetUrl = `${process.env.NEXTAUTH_URL || "http://localhost:3000"
-        }/reset-password?token=${resetToken}&email=${encodeURIComponent(
-          email.toLowerCase()
-        )}`;
+      const resetUrl = `${
+        process.env.NEXTAUTH_URL || "http://localhost:3000"
+      }/reset-password?token=${resetToken}&email=${encodeURIComponent(
+        email.toLowerCase()
+      )}`;
 
       // TODO: Implement email sending
       // await sendPasswordResetEmail(email, resetToken);
@@ -85,7 +83,9 @@ async function POST(request) {
         success: false,
         message: "Internal server error",
         error:
-          process.env.NODE_ENV === "development" ? error.message : undefined,
+          process.env.NODE_ENV === "development" && error instanceof Error
+            ? error.message
+            : undefined,
       },
       { status: 500 }
     );
