@@ -1,14 +1,13 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import jwt from "jsonwebtoken";
 import { GoogleGenerativeAI } from "@google/generative-ai";
-import { PrismaClient } from "@prisma/client";
+import { prisma } from "../../../../lib/prisma";
 
 // Initialize Gemini AI and Prisma
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-const prisma = new PrismaClient();
+const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
 
 // Function to extract text from PDF using Gemini Vision API
-async function extractTextFromPDFWithAI(buffer) {
+async function extractTextFromPDFWithAI(buffer: Buffer) {
   try {
     const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
 
@@ -41,7 +40,7 @@ async function extractTextFromPDFWithAI(buffer) {
   }
 }
 
-export async function POST(request) {
+export async function POST(request: NextRequest) {
   try {
     // Check authentication
     const authHeader = request.headers.get("authorization");
@@ -55,18 +54,38 @@ export async function POST(request) {
     const token = authHeader.replace("Bearer ", "");
     let decoded;
     try {
-      decoded = jwt.verify(token, process.env.JWT_SECRET);
+      decoded = jwt.verify(token, process.env.JWT_SECRET!);
     } catch (error) {
       return NextResponse.json(
         { error: "Invalid or expired token" },
         { status: 401 }
       );
     }
+    if (!decoded || typeof decoded !== "object" || !("userId" in decoded)) {
+      return NextResponse.json(
+        { error: "Invalid token payload" },
+        { status: 401 }
+      );
+    }
+
+    const userId = decoded.userId as string;
 
     // Parse the form data
     const formData = await request.formData();
-    const resumeFile = formData.get("resume");
-    const jobDescription = formData.get("jobDescription");
+    const resumeEntry = formData.get("resume");
+
+    if (!(resumeEntry instanceof File)) {
+      return NextResponse.json(
+        { error: "Invalid file upload" },
+        { status: 400 }
+      );
+    }
+
+    const resumeFile = resumeEntry; // Now correctly typed as File
+
+    const jobDescriptionRaw = formData.get("jobDescription");
+    const jobDescription =
+      typeof jobDescriptionRaw === "string" ? jobDescriptionRaw : null;
 
     // Validate that a resume file was provided
     if (!resumeFile) {
@@ -160,7 +179,7 @@ Please ensure all scores are realistic and constructive. Provide specific, actio
         try {
           await prisma.resumeAnalysis.create({
             data: {
-              userId: decoded.userId,
+              userId: userId,
               fileName: "text_resume_analysis.txt",
               analysisType: "TEXT",
               overallScore: analysis.overallScore,

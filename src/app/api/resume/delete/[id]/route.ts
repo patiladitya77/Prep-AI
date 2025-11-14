@@ -1,13 +1,17 @@
-const { NextResponse } = require("next/server");
-const { PrismaClient } = require("@prisma/client");
+import { NextRequest, NextResponse } from "next/server";
+
+import { prisma } from "../../../../../lib/prisma";
 const jwt = require("jsonwebtoken");
 const fs = require("fs").promises;
 const path = require("path");
 
-const prisma = new PrismaClient();
 const JWT_SECRET = process.env.JWT_SECRET;
-
-export async function DELETE(request, { params }) {
+type ResumeParams = {
+  params: {
+    id: string;
+  };
+};
+export async function DELETE(request: NextRequest, { params }: ResumeParams) {
   try {
     // Get authorization token
     const authHeader = request.headers.get("authorization");
@@ -53,7 +57,11 @@ export async function DELETE(request, { params }) {
         const fullPath = path.join(process.cwd(), "public", resume.file_path);
         await fs.unlink(fullPath);
       } catch (fileError) {
-        console.log("File not found or already deleted:", fileError.message);
+        if (fileError instanceof Error) {
+          console.log("File not found or already deleted:", fileError.message);
+        } else {
+          console.log("File deletion error (unknown):", String(fileError));
+        }
       }
     }
 
