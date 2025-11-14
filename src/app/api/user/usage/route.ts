@@ -1,10 +1,10 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import jwt from "jsonwebtoken";
 import { PrismaClient } from "@prisma/client";
 
 const prisma = new PrismaClient();
 
-export async function GET(request) {
+export async function GET(request: NextRequest) {
   try {
     // Get the authorization header
     const authHeader = request.headers.get("authorization");
@@ -15,21 +15,25 @@ export async function GET(request) {
     const token = authHeader.substring(7);
 
     // Verify the JWT token
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    const decoded = jwt.verify(token, process.env.JWT_SECRET!);
+    //for type safety
+    if (typeof decoded === "string" || !("userId" in decoded)) {
+      return NextResponse.json(
+        { success: false, message: "Invalid token payload" },
+        { status: 401 }
+      );
+    }
     const userId = decoded.userId;
     const user = await prisma.user.findUnique({
       where: { id: userId },
       select: {
-
         isPremium: true,
-
       },
     });
 
     if (!user) {
       return NextResponse.json({ error: "User not found" }, { status: 404 });
     }
-
 
     // Get user's interview sessions count
     const interviewCount = await prisma.interviewSession.count({
@@ -46,8 +50,8 @@ export async function GET(request) {
     if (user.isPremium) {
       limits = {
         interviews: 20,
-        resumes: 20
-      }
+        resumes: 20,
+      };
     } else {
       limits = {
         interviews: 4,
@@ -71,12 +75,14 @@ export async function GET(request) {
 
     return NextResponse.json({ usage });
   } catch (error) {
-    console.error("Error fetching usage statistics:", error);
-    if (error.name === "JsonWebTokenError") {
+    console.error("Error updating goal:", error);
+
+    if (error instanceof Error && error.name === "JsonWebTokenError") {
       return NextResponse.json({ error: "Invalid token" }, { status: 401 });
     }
+
     return NextResponse.json(
-      { error: "Failed to fetch usage statistics" },
+      { error: "Failed to update goal" },
       { status: 500 }
     );
   }
