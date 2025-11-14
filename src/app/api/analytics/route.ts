@@ -1,10 +1,8 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import jwt from "jsonwebtoken";
-import { PrismaClient } from "@prisma/client";
+import { prisma } from "../../../lib/prisma";
 
-const prisma = new PrismaClient();
-
-export async function GET(request) {
+export async function GET(request: NextRequest) {
   try {
     // Check authentication
     const authHeader = request.headers.get("authorization");
@@ -18,14 +16,20 @@ export async function GET(request) {
     const token = authHeader.replace("Bearer ", "");
     let decoded;
     try {
-      decoded = jwt.verify(token, process.env.JWT_SECRET);
+      decoded = jwt.verify(token, process.env.JWT_SECRET!);
     } catch (error) {
       return NextResponse.json(
         { error: "Invalid or expired token" },
         { status: 401 }
       );
     }
-
+    //for type safety
+    if (typeof decoded === "string" || !("userId" in decoded)) {
+      return NextResponse.json(
+        { success: false, message: "Invalid token payload" },
+        { status: 401 }
+      );
+    }
     const userId = decoded.userId;
 
     // Fetch user's interview sessions with related data

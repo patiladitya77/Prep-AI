@@ -1,11 +1,16 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import jwt from "jsonwebtoken";
-import { PrismaClient } from "@prisma/client";
+import { prisma } from "../../../../lib/prisma";
+import { GoalCategory } from "@prisma/client";
 
-const prisma = new PrismaClient();
+interface RouteParams {
+  params: {
+    id: string;
+  };
+}
 
 // PUT - Update a goal
-export async function PUT(request, { params }) {
+export async function PUT(request: NextRequest, { params }: RouteParams) {
   try {
     // Get the authorization header
     const authHeader = request.headers.get("authorization");
@@ -16,7 +21,14 @@ export async function PUT(request, { params }) {
     const token = authHeader.substring(7);
 
     // Verify the JWT token
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    const decoded = jwt.verify(token, process.env.JWT_SECRET!);
+    //for type safety
+    if (typeof decoded === "string" || !("userId" in decoded)) {
+      return NextResponse.json(
+        { success: false, message: "Invalid token payload" },
+        { status: 401 }
+      );
+    }
     const userId = decoded.userId;
 
     // Check if user exists
@@ -47,8 +59,16 @@ export async function PUT(request, { params }) {
     }
 
     // Prepare update data
-    const updateData = {};
 
+    interface IupdateData {
+      title?: string;
+      description?: string;
+      targetDate?: Date;
+      completed?: boolean;
+      progress?: number;
+      category?: GoalCategory;
+    }
+    const updateData: IupdateData = {};
     if (title !== undefined) updateData.title = title;
     if (description !== undefined) updateData.description = description;
     if (targetDate !== undefined) updateData.targetDate = new Date(targetDate);
@@ -64,20 +84,23 @@ export async function PUT(request, { params }) {
     }
 
     if (category !== undefined) {
-      const categoryMap = {
+      const categoryMap: Record<
+        "interview" | "learning" | "practice" | "resume",
+        string
+      > = {
         interview: "INTERVIEW",
         learning: "LEARNING",
         practice: "PRACTICE",
         resume: "RESUME",
       };
-      const goalCategory = categoryMap[category];
+      const goalCategory = categoryMap[category as keyof typeof categoryMap];
       if (!goalCategory) {
         return NextResponse.json(
           { error: "Invalid category" },
           { status: 400 }
         );
       }
-      updateData.category = goalCategory;
+      updateData.category = goalCategory as GoalCategory;
     }
 
     // Update the goal
@@ -89,9 +112,11 @@ export async function PUT(request, { params }) {
     return NextResponse.json({ goal: updatedGoal });
   } catch (error) {
     console.error("Error updating goal:", error);
-    if (error.name === "JsonWebTokenError") {
+
+    if (error instanceof Error && error.name === "JsonWebTokenError") {
       return NextResponse.json({ error: "Invalid token" }, { status: 401 });
     }
+
     return NextResponse.json(
       { error: "Failed to update goal" },
       { status: 500 }
@@ -100,7 +125,7 @@ export async function PUT(request, { params }) {
 }
 
 // DELETE - Delete a goal
-export async function DELETE(request, { params }) {
+export async function DELETE(request: NextRequest, { params }: RouteParams) {
   try {
     // Get the authorization header
     const authHeader = request.headers.get("authorization");
@@ -111,7 +136,14 @@ export async function DELETE(request, { params }) {
     const token = authHeader.substring(7);
 
     // Verify the JWT token
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    const decoded = jwt.verify(token, process.env.JWT_SECRET!);
+    //for type safety
+    if (typeof decoded === "string" || !("userId" in decoded)) {
+      return NextResponse.json(
+        { success: false, message: "Invalid token payload" },
+        { status: 401 }
+      );
+    }
     const userId = decoded.userId;
 
     // Check if user exists
@@ -146,12 +178,14 @@ export async function DELETE(request, { params }) {
 
     return NextResponse.json({ message: "Goal deleted successfully" });
   } catch (error) {
-    console.error("Error deleting goal:", error);
-    if (error.name === "JsonWebTokenError") {
+    console.error("Error updating goal:", error);
+
+    if (error instanceof Error && error.name === "JsonWebTokenError") {
       return NextResponse.json({ error: "Invalid token" }, { status: 401 });
     }
+
     return NextResponse.json(
-      { error: "Failed to delete goal" },
+      { error: "Failed to update goal" },
       { status: 500 }
     );
   }

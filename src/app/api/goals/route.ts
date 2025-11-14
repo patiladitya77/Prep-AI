@@ -1,11 +1,10 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import jwt from "jsonwebtoken";
-import { PrismaClient } from "@prisma/client";
-
-const prisma = new PrismaClient();
+import { prisma } from "../../../lib/prisma";
+import { GoalCategory } from "@prisma/client";
 
 // GET - Fetch all goals for the user
-export async function GET(request) {
+export async function GET(request: NextRequest) {
   try {
     // Get the authorization header
     const authHeader = request.headers.get("authorization");
@@ -16,7 +15,14 @@ export async function GET(request) {
     const token = authHeader.substring(7);
 
     // Verify the JWT token
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    const decoded = jwt.verify(token, process.env.JWT_SECRET!);
+    //for type safety
+    if (typeof decoded === "string" || !("userId" in decoded)) {
+      return NextResponse.json(
+        { success: false, message: "Invalid token payload" },
+        { status: 401 }
+      );
+    }
     const userId = decoded.userId;
 
     // Check if user exists
@@ -41,19 +47,21 @@ export async function GET(request) {
 
     return NextResponse.json({ goals });
   } catch (error) {
-    console.error("Error fetching goals:", error);
-    if (error.name === "JsonWebTokenError") {
+    console.error("Error updating goal:", error);
+
+    if (error instanceof Error && error.name === "JsonWebTokenError") {
       return NextResponse.json({ error: "Invalid token" }, { status: 401 });
     }
+
     return NextResponse.json(
-      { error: "Failed to fetch goals" },
+      { error: "Failed to update goal" },
       { status: 500 }
     );
   }
 }
 
 // POST - Create a new goal
-export async function POST(request) {
+export async function POST(request: NextRequest) {
   try {
     // Get the authorization header
     const authHeader = request.headers.get("authorization");
@@ -64,7 +72,14 @@ export async function POST(request) {
     const token = authHeader.substring(7);
 
     // Verify the JWT token
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    const decoded = jwt.verify(token, process.env.JWT_SECRET!);
+    //for type safety
+    if (typeof decoded === "string" || !("userId" in decoded)) {
+      return NextResponse.json(
+        { success: false, message: "Invalid token payload" },
+        { status: 401 }
+      );
+    }
     const userId = decoded.userId;
 
     // Check if user exists
@@ -95,14 +110,18 @@ export async function POST(request) {
     }
 
     // Map category to enum value
-    const categoryMap = {
-      interview: "INTERVIEW",
-      learning: "LEARNING",
-      practice: "PRACTICE",
-      resume: "RESUME",
+    const categoryMap: Record<
+      "interview" | "learning" | "practice" | "resume",
+      GoalCategory
+    > = {
+      interview: GoalCategory.INTERVIEW,
+      learning: GoalCategory.LEARNING,
+      practice: GoalCategory.PRACTICE,
+      resume: GoalCategory.RESUME,
     };
 
-    const goalCategory = categoryMap[category];
+    const goalCategory = categoryMap[category as keyof typeof categoryMap];
+
     if (!goalCategory) {
       return NextResponse.json(
         {
@@ -128,9 +147,11 @@ export async function POST(request) {
     return NextResponse.json({ goal }, { status: 201 });
   } catch (error) {
     console.error("Error creating goal:", error);
-    if (error.name === "JsonWebTokenError") {
+
+    if (error instanceof Error && error.name === "JsonWebTokenError") {
       return NextResponse.json({ error: "Invalid token" }, { status: 401 });
     }
+
     return NextResponse.json(
       { error: "Failed to create goal" },
       { status: 500 }
