@@ -1,11 +1,15 @@
-import { PrismaClient } from "@prisma/client";
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import jwt from "jsonwebtoken";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 
-const prisma = new PrismaClient();
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-const JWT_SECRET = process.env.JWT_SECRET;
+import { prisma } from "../../../../lib/prisma";
+const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
+const JWT_SECRET = process.env.JWT_SECRET!;
+
+//helper
+function isJsonObject(data: unknown): data is Record<string, any> {
+  return typeof data === "object" && data !== null && !Array.isArray(data);
+}
 
 // Temporary storage reference (shared with answer route)
 const temporaryScores = new Map();
@@ -13,7 +17,7 @@ const temporaryAnswers = new Map();
 
 // Rate limiting for Gemini API
 const apiCallTracker = {
-  calls: [],
+  calls: [] as number[],
   maxCallsPerMinute: 8, // Stay under the 10 call/minute limit
 
   canMakeCall() {
@@ -31,7 +35,7 @@ const apiCallTracker = {
   },
 };
 
-export async function POST(request) {
+export async function POST(request: NextRequest) {
   try {
     let requestBody;
     try {
@@ -66,7 +70,13 @@ export async function POST(request) {
     } catch (error) {
       return NextResponse.json({ error: "Invalid token" }, { status: 401 });
     }
-
+    //for type safety
+    if (typeof decoded === "string" || !("userId" in decoded)) {
+      return NextResponse.json(
+        { success: false, message: "Invalid token payload" },
+        { status: 401 }
+      );
+    }
     const userId = decoded.userId;
 
     let finalResults;
@@ -167,6 +177,9 @@ export async function POST(request) {
           feedback: generateOverallFeedback(averageScore, completionPercentage),
         },
       });
+      const jdRaw = session.jd?.parsedData;
+
+      const jdData = isJsonObject(jdRaw) ? (jdRaw as Record<string, any>) : {};
 
       finalResults = {
         sessionId,
@@ -180,7 +193,8 @@ export async function POST(request) {
           averageScore,
           completionPercentage
         ),
-        jobRole: session.jd?.parsedData?.jobRole || "Software Developer",
+        jobRole: jdData.jobRole ?? "Software Developer",
+
         completedAt: new Date().toISOString(),
       };
     } catch (dbError) {
@@ -269,7 +283,7 @@ export async function POST(request) {
   }
 }
 
-function getGrade(score) {
+function getGrade(score: number) {
   if (score >= 9) return "Excellent";
   if (score >= 8) return "Good";
   if (score >= 7) return "Average";
@@ -277,7 +291,7 @@ function getGrade(score) {
   return "Needs Improvement";
 }
 
-function generateOverallFeedback(score, completion) {
+function generateOverallFeedback(score: number, completion: number) {
   const grade = getGrade(score);
   let feedback = `You completed ${completion.toFixed(
     0
@@ -302,7 +316,7 @@ function generateOverallFeedback(score, completion) {
   return feedback;
 }
 
-function getFallbackScore(answer) {
+function getFallbackScore(answer: string) {
   const answerLength = answer.trim().length;
   const wordCount = answer.trim().split(/\s+/).length;
 
@@ -347,7 +361,11 @@ function getFallbackScore(answer) {
   };
 }
 
-async function generateFeedbackAndScore(questionText, answer, session) {
+async function generateFeedbackAndScore(
+  questionText: string,
+  answer: string,
+  session: any
+) {
   try {
     // Check if Gemini API is available and rate limit
     if (!genAI || !process.env.GEMINI_API_KEY) {
@@ -385,7 +403,7 @@ async function generateFeedbackAndScore(questionText, answer, session) {
       contextInfo += `Candidate Experience: ${
         Array.isArray(resumeData.experience)
           ? resumeData.experience
-              .map((exp) => `${exp.position} at ${exp.company}`)
+              .map((exp: any) => `${exp.position} at ${exp.company}`)
               .join("; ")
           : "N/A"
       }\n`;
@@ -425,7 +443,7 @@ async function generateFeedbackAndScore(questionText, answer, session) {
     apiCallTracker.recordCall();
 
     // Add timeout and retry logic for API calls
-    const result = await Promise.race([
+    const result = await Promise.race<any>([
       model.generateContent(prompt),
       new Promise((_, reject) =>
         setTimeout(() => reject(new Error("API timeout")), 15000)
@@ -473,17 +491,14 @@ async function generateFeedbackAndScore(questionText, answer, session) {
   } catch (error) {
     console.error("❌ Error generating AI feedback:", error);
 
-    // Handle specific API quota errors
-    if (
-      error.status === 429 ||
-      (error.message && error.message.includes("quota"))
-    ) {
-      console.warn("⚠️ API quota exceeded, using fallback scoring");
-    } else if (error.message && error.message.includes("timeout")) {
-      console.warn("⚠️ API timeout, using fallback scoring");
+    if (error instanceof Error) {
+      if (error.message.includes("quota") || (error as any).status === 429) {
+        console.warn("⚠️ API quota exceeded, using fallback scoring");
+      } else if (error.message.includes("timeout")) {
+        console.warn("⚠️ API timeout, using fallback scoring");
+      }
     }
 
-    // Use the same fallback logic as the helper function
     return getFallbackScore(answer);
   }
 }

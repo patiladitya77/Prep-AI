@@ -81,9 +81,16 @@ export async function GET(request: NextRequest) {
     const skillsMap = new Map();
 
     interviewSessions.forEach((session) => {
-      if (session.jd?.parsedData?.skills) {
-        const skills = Array.isArray(session.jd.parsedData.skills)
-          ? session.jd.parsedData.skills
+      const parsed = session.jd?.parsedData;
+
+      if (
+        parsed &&
+        typeof parsed === "object" &&
+        !Array.isArray(parsed) &&
+        "skills" in parsed
+      ) {
+        const skills = Array.isArray((parsed as any).skills)
+          ? ((parsed as any).skills as string[])
           : [];
 
         skills.forEach((skill) => {
@@ -91,11 +98,11 @@ export async function GET(request: NextRequest) {
             skillsMap.set(skill, { scores: [], count: 0 });
           }
 
-          // Add session score for this skill
           if (session.score !== null) {
-            skillsMap.get(skill).scores.push(session.score);
+            skillsMap.get(skill)!.scores.push(session.score);
           }
-          skillsMap.get(skill).count += 1;
+
+          skillsMap.get(skill)!.count += 1;
         });
       }
     });
@@ -105,8 +112,10 @@ export async function GET(request: NextRequest) {
         skill,
         averageScore:
           data.scores.length > 0
-            ? data.scores.reduce((sum, score) => sum + score, 0) /
-              data.scores.length
+            ? data.scores.reduce(
+                (sum: number, score: number) => sum + score,
+                0
+              ) / data.scores.length
             : 0,
         count: data.count,
       }))
@@ -147,8 +156,10 @@ export async function GET(request: NextRequest) {
         interviews: data.interviews,
         averageScore:
           Array.isArray(data.scores) && data.scores.length > 0
-            ? data.scores.reduce((sum, score) => sum + score, 0) /
-              data.scores.length
+            ? data.scores.reduce(
+                (sum: number, score: number) => sum + score,
+                0
+              ) / data.scores.length
             : 0,
       }))
       .sort((a, b) => b.month.localeCompare(a.month))
@@ -158,7 +169,10 @@ export async function GET(request: NextRequest) {
     const totalResumeAnalyses = resumeAnalyses.length;
     const resumeAnalytics = resumeAnalyses.map((analysis) => {
       // Parse detailed scores if it's a JSON string
-      let detailedScores = {};
+      type ResumeScoreMap = Record<string, number>;
+
+      let detailedScores: ResumeScoreMap = {};
+
       try {
         detailedScores =
           typeof analysis.detailedScores === "string"
@@ -219,6 +233,7 @@ export async function GET(request: NextRequest) {
     const recentResumes = resumeAnalytics.slice(0, 5);
 
     // Resume skills frequency analysis from detailed scores
+
     const resumeSkillsMap = new Map();
     resumeAnalytics.forEach((analysis) => {
       if (
@@ -245,8 +260,10 @@ export async function GET(request: NextRequest) {
         averageScore:
           data.scores.length > 0
             ? Math.round(
-                data.scores.reduce((sum, score) => sum + score, 0) /
-                  data.scores.length
+                data.scores.reduce(
+                  (sum: number, score: number) => sum + score,
+                  0
+                ) / data.scores.length
               )
             : 0,
       }))

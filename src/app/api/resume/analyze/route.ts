@@ -28,11 +28,11 @@ async function extractTextFromPDFWithAI(buffer: Buffer) {
     ]);
 
     const extractedText = result.response.text();
-    console.log(
-      "📄 PDF text extracted, length:",
-      extractedText.length,
-      "chars"
-    );
+    // console.log(
+    //   "📄 PDF text extracted, length:",
+    //   extractedText.length,
+    //   "chars"
+    // );
     return extractedText;
   } catch (error) {
     console.error("PDF AI extraction error:", error);

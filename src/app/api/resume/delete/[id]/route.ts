@@ -6,12 +6,12 @@ const fs = require("fs").promises;
 const path = require("path");
 
 const JWT_SECRET = process.env.JWT_SECRET;
-type ResumeParams = {
-  params: {
+interface interviewParams {
+  params: Promise<{
     id: string;
-  };
-};
-export async function DELETE(request: NextRequest, { params }: ResumeParams) {
+  }>;
+}
+export async function DELETE(request: NextRequest, props: interviewParams) {
   try {
     // Get authorization token
     const authHeader = request.headers.get("authorization");
@@ -34,6 +34,7 @@ export async function DELETE(request: NextRequest, { params }: ResumeParams) {
     }
 
     const userId = decoded.userId;
+    const params = await props.params;
     const resumeId = params.id;
 
     // Find the resume to ensure it belongs to the user

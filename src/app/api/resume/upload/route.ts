@@ -191,21 +191,21 @@ async function POST(request: NextRequest) {
     const buffer: Buffer = Buffer.from(arrayBuffer);
 
     // Extract text from PDF using AI
-    console.log("🔄 Extracting text from PDF using Gemini AI...");
+    // console.log("🔄 Extracting text from PDF using Gemini AI...");
     const extractedText = await extractTextFromPDFWithAI(buffer);
 
     // Parse the extracted text with AI
-    console.log("🧠 Parsing extracted text with AI...");
+    // console.log("🧠 Parsing extracted text with AI...");
     let parsedData;
     try {
       parsedData = await parseResumeWithAI(extractedText);
-      console.log("✅ Resume parsed successfully:", {
-        name: parsedData.name || "N/A",
-        skills: parsedData.skills?.length || 0,
-        projects: parsedData.projects?.length || 0,
-        experience: parsedData.experience?.length || 0,
-        education: parsedData.education?.length || 0,
-      });
+      // console.log("✅ Resume parsed successfully:", {
+      //   name: parsedData.name || "N/A",
+      //   skills: parsedData.skills?.length || 0,
+      //   projects: parsedData.projects?.length || 0,
+      //   experience: parsedData.experience?.length || 0,
+      //   education: parsedData.education?.length || 0,
+      // });
     } catch (aiError) {
       console.error("❌ AI parsing failed:", aiError);
       // Fallback parsed data if AI fails

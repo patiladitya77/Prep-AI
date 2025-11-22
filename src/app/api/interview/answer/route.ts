@@ -1,11 +1,10 @@
-import { PrismaClient } from "@prisma/client";
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import jwt from "jsonwebtoken";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 
-const prisma = new PrismaClient();
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-const JWT_SECRET = process.env.JWT_SECRET;
+import { prisma } from "../../../../lib/prisma";
+const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
+const JWT_SECRET = process.env.JWT_SECRET!;
 
 // In-memory storage for answers when database is unavailable
 const temporaryAnswers = new Map();
@@ -13,7 +12,7 @@ const temporaryScores = new Map();
 
 // Rate limiting for Gemini API (shared with finish route)
 const apiCallTracker = {
-  calls: [],
+  calls: [] as number[],
   maxCallsPerMinute: 8, // Stay under the 10 call/minute limit
 
   canMakeCall() {
@@ -31,7 +30,7 @@ const apiCallTracker = {
   },
 };
 
-export async function POST(request) {
+export async function POST(request: NextRequest) {
   try {
     // Parse request body
     const { sessionId, questionId, answer } = await request.json();
@@ -57,7 +56,13 @@ export async function POST(request) {
     } catch (error) {
       return NextResponse.json({ error: "Invalid token" }, { status: 401 });
     }
-
+    //for type safety
+    if (typeof decoded === "string" || !("userId" in decoded)) {
+      return NextResponse.json(
+        { success: false, message: "Invalid token payload" },
+        { status: 401 }
+      );
+    }
     const userId = decoded.userId;
 
     // Try database first, fallback to temporary storage if database is unavailable
@@ -150,7 +155,7 @@ export async function POST(request) {
       }`,
       data: {
         answerId: savedAnswer.id,
-        submittedAt: savedAnswer.submittedAt || savedAnswer.timestamp,
+        submittedAt: savedAnswer.submittedAt,
         fallbackMode: usedFallback,
       },
     });
@@ -164,7 +169,7 @@ export async function POST(request) {
 }
 
 // Fallback scoring function for when API is unavailable
-function getFallbackScore(answer) {
+function getFallbackScore(answer: string) {
   const answerLength = answer.trim().length;
   const wordCount = answer.trim().split(/\s+/).length;
 
@@ -191,7 +196,11 @@ function getFallbackScore(answer) {
   };
 }
 
-async function generateFeedbackAndScore(questionText, answer, session) {
+async function generateFeedbackAndScore(
+  questionText: string,
+  answer: string,
+  session: any
+) {
   try {
     // Check if Gemini API is available and rate limit
     if (!genAI || !process.env.GEMINI_API_KEY) {
@@ -224,7 +233,10 @@ async function generateFeedbackAndScore(questionText, answer, session) {
       contextInfo += `Candidate Experience: ${
         Array.isArray(resumeData.experience)
           ? resumeData.experience
-              .map((exp) => `${exp.position} at ${exp.company}`)
+              .map(
+                (exp: { position?: string; company?: string }) =>
+                  `${exp.position} at ${exp.company}`
+              )
               .join("; ")
           : "N/A"
       }\n`;
@@ -273,8 +285,14 @@ async function generateFeedbackAndScore(questionText, answer, session) {
         setTimeout(() => reject(new Error("API timeout")), 10000)
       ),
     ]);
-
-    const response = await result.response;
+    if (
+      typeof result !== "object" ||
+      result === null ||
+      !("response" in result)
+    ) {
+      throw new Error("Invalid AI response");
+    }
+    const response = await (result as any).response;
     const text = response.text();
 
     // Clean and parse the response
@@ -299,12 +317,18 @@ async function generateFeedbackAndScore(questionText, answer, session) {
 
     // Handle specific API quota errors
     if (
-      error.status === 429 ||
-      (error.message && error.message.includes("quota"))
+      typeof error === "object" &&
+      error !== null &&
+      "message" in error &&
+      typeof (error as any).message === "string"
     ) {
-      console.warn("⚠️ API quota exceeded, using fallback scoring");
-    } else if (error.message && error.message.includes("timeout")) {
-      console.warn("⚠️ API timeout, using fallback scoring");
+      const err = error as { status?: number; message: string };
+
+      if (err.status === 429 || err.message.includes("quota")) {
+        console.warn("⚠️ API quota exceeded, using fallback scoring");
+      } else if (err.message.includes("timeout")) {
+        console.warn("⚠️ API timeout, using fallback scoring");
+      }
     }
 
     return getFallbackScore(answer);

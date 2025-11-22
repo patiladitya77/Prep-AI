@@ -1,11 +1,11 @@
-import { NextResponse } from "next/server";
-import { PrismaClient } from "@prisma/client";
-import jwt from "jsonwebtoken"
+import { NextRequest, NextResponse } from "next/server";
 
-const prisma = new PrismaClient();
+import jwt from "jsonwebtoken";
+
+import { prisma } from "../../../../lib/prisma";
 const JWT_SECRET = process.env.JWT_SECRET || "your-secret-key";
 
-async function GET(request) {
+async function GET(request: NextRequest) {
   try {
     // Get token from Authorization header (to match existing auth system)
     const authHeader = request.headers.get("authorization");
@@ -26,7 +26,13 @@ async function GET(request) {
     } catch (error) {
       return NextResponse.json({ error: "Invalid token" }, { status: 401 });
     }
-
+    //for type safety
+    if (typeof decoded === "string" || !("userId" in decoded)) {
+      return NextResponse.json(
+        { success: false, message: "Invalid token payload" },
+        { status: 401 }
+      );
+    }
     const userId = decoded.userId;
 
     // Check if specific sessionId is requested
@@ -83,15 +89,16 @@ async function GET(request) {
       feedback: session.feedback,
       startedAt: session.startedAt,
       endedAt: session.endedAt,
-      jobRole: session.job_role,
-      jobDescription: session.job_description,
-      experienceYears: session.experience_years,
+      // jobRole: session.job_role,
+      // jobDescription: session.job_description,
+      // experienceYears: session.experience_years,
+      jd: session.jd ? session.jd.parsedData : null,
       resume: session.resume
         ? {
-          id: session.resume.id,
-          fileName: session.resume.file_name,
-          parsedData: session.resume.parsedData,
-        }
+            id: session.resume.id,
+            fileName: session.resume.file_name,
+            parsedData: session.resume.parsedData,
+          }
         : null,
     }));
 

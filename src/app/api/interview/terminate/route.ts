@@ -1,11 +1,10 @@
-import { NextResponse } from "next/server";
-import { PrismaClient } from "@prisma/client";
-import jwt from "jsonwebtoken"
+import { NextRequest, NextResponse } from "next/server";
 
-const prisma = new PrismaClient();
+import jwt from "jsonwebtoken";
+import { prisma } from "../../../../lib/prisma";
 const JWT_SECRET = process.env.JWT_SECRET || "your-secret-key";
 
-async function POST(request) {
+async function POST(request: NextRequest) {
   try {
     // Get token from Authorization header
     const authHeader = request.headers.get("authorization");
@@ -26,7 +25,13 @@ async function POST(request) {
     } catch (error) {
       return NextResponse.json({ error: "Invalid token" }, { status: 401 });
     }
-
+    //for type safety
+    if (typeof decoded === "string" || !("userId" in decoded)) {
+      return NextResponse.json(
+        { success: false, message: "Invalid token payload" },
+        { status: 401 }
+      );
+    }
     const userId = decoded.userId;
 
     // Parse the request body
@@ -64,8 +69,9 @@ async function POST(request) {
       data: {
         status: "ABANDONED",
         endedAt: new Date(),
-        feedback: `Interview terminated: ${reason}. Warning count: ${warningCount || 0
-          }`,
+        feedback: `Interview terminated: ${reason}. Warning count: ${
+          warningCount || 0
+        }`,
       },
     });
 
@@ -79,15 +85,28 @@ async function POST(request) {
 
     // If Prisma engine returned an error with additional metadata, include
     // small, non-sensitive details to aid debugging in dev.
-    const isPrismaErr = error && error.name && error.name.startsWith("Prisma");
+    const isPrismaErr =
+      error &&
+      typeof error === "object" &&
+      "name" in error &&
+      typeof (error as any).name === "string" &&
+      (error as any).name.startsWith("Prisma");
     if (isPrismaErr) {
-      const safeDetails = {
-        name: error.name,
-        message: error.message,
+      const err = error as Error;
+
+      const safeDetails: {
+        name: string;
+        message: string;
+        stack?: string;
+      } = {
+        name: err.name,
+        message: err.message,
       };
-      if (process.env.NODE_ENV === "development") {
-        safeDetails.stack = error.stack;
+
+      if (process.env.NODE_ENV === "development" && err.stack) {
+        safeDetails.stack = err.stack;
       }
+
       return NextResponse.json(
         { error: "Prisma error", details: safeDetails },
         { status: 500 }

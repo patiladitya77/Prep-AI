@@ -1,8 +1,29 @@
-import { PrismaClient } from "@prisma/client";
-const prisma = new PrismaClient();
+import { prisma } from "../lib/prisma";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 // Initialize Gemini AI
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
+interface ResumeData {
+  name?: string;
+  skills?: string[];
+  experience?: {
+    position: string;
+    company: string;
+    duration: string;
+  }[];
+  projects?: {
+    name?: string;
+    title?: string;
+    description?: string;
+    technologies?: string[];
+    tech?: string;
+  }[];
+  education?: {
+    degree: string;
+    field: string;
+    institution: string;
+  }[];
+  summary?: string;
+}
 
 const generateInterviewQuestions = async (
   sessionId: string,
@@ -53,7 +74,7 @@ const generateInterviewQuestions = async (
     // Prepare resume data for the prompt
     let resumeInfo = "";
     if (session.resume && session.resume.parsedData) {
-      const resumeData = session.resume.parsedData;
+      const resumeData = session.resume.parsedData as ResumeData;
       resumeInfo = `
           Resume Information:
           - Name: ${resumeData.name || "N/A"}
@@ -277,7 +298,7 @@ const generateInterviewQuestions = async (
       }
 
       // Add experience-level appropriate questions
-      if (parseInt(experienceLevel) <= 2) {
+      if (experienceLevel <= 2) {
         // Junior level questions
         fallbackQuestions.push(
           {
@@ -299,7 +320,7 @@ const generateInterviewQuestions = async (
             focus_area: "Learning & Growth",
           }
         );
-      } else if (parseInt(experienceLevel) <= 5) {
+      } else if (experienceLevel <= 5) {
         // Mid-level questions
         fallbackQuestions.push(
           {
@@ -378,11 +399,13 @@ const generateInterviewQuestions = async (
     }
 
     // Store questions in database
-    const questionsToCreate = questionsData.questions.map((q, index) => ({
-      sessionId: sessionId,
-      questionText: q.text,
-      order: index + 1,
-    }));
+    const questionsToCreate = questionsData.questions.map(
+      (q: any, index: number) => ({
+        sessionId: sessionId,
+        questionText: q.text,
+        order: index + 1,
+      })
+    );
 
     const createdQuestions = await prisma.question.createMany({
       data: questionsToCreate,

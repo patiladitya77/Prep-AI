@@ -3,15 +3,13 @@ import jwt from "jsonwebtoken";
 import { prisma } from "../../../../lib/prisma";
 import { GoalCategory } from "@prisma/client";
 
-interface RouteParams {
-  params: {
-    id: string;
-  };
-}
-
 // PUT - Update a goal
-export async function PUT(request: NextRequest, { params }: RouteParams) {
+export async function PUT(
+  request: NextRequest,
+  props: { params: Promise<{ id: string }> }
+) {
   try {
+    const params = await props.params;
     // Get the authorization header
     const authHeader = request.headers.get("authorization");
     if (!authHeader || !authHeader.startsWith("Bearer ")) {
@@ -125,8 +123,12 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
 }
 
 // DELETE - Delete a goal
-export async function DELETE(request: NextRequest, { params }: RouteParams) {
+export async function DELETE(
+  request: NextRequest,
+  props: { params: Promise<{ id: string }> }
+) {
   try {
+    const params = await props.params;
     // Get the authorization header
     const authHeader = request.headers.get("authorization");
     if (!authHeader || !authHeader.startsWith("Bearer ")) {
