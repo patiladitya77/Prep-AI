@@ -1,11 +1,25 @@
-import { NextResponse } from "next/server";
-import { PrismaClient } from "@prisma/client";
+import { NextRequest, NextResponse } from "next/server";
 import { verifyToken } from "@/lib/auth/helpers.js";
 
-const prisma = new PrismaClient();
+import { prisma } from "../../../../lib/prisma";
 
-export async function GET(request, { params }) {
+// 1. Update the interface: params is now a Promise
+interface interviewParams {
+  params: Promise<{
+    interviewId: string;
+  }>;
+}
+
+function isJsonObject(data: unknown): data is Record<string, any> {
+  return typeof data === "object" && data !== null && !Array.isArray(data);
+}
+
+export async function GET(request: NextRequest, props: interviewParams) {
   try {
+    // 2. Await the params before using them
+    const params = await props.params;
+    const interviewId = params.interviewId;
+
     const token = request.headers.get("authorization")?.replace("Bearer ", "");
 
     if (!token) {
@@ -19,9 +33,14 @@ export async function GET(request, { params }) {
     if (!decoded) {
       return NextResponse.json({ error: "Invalid token" }, { status: 401 });
     }
-
+    //for type safety
+    if (typeof decoded === "string" || !("userId" in decoded)) {
+      return NextResponse.json(
+        { success: false, message: "Invalid token payload" },
+        { status: 401 }
+      );
+    }
     const userId = decoded.userId;
-    const interviewId = params.interviewId;
 
     if (!interviewId) {
       return NextResponse.json(
@@ -91,7 +110,7 @@ export async function GET(request, { params }) {
     const answersWithScores = questionResults.filter((q) => q.score !== null);
     const overallScore =
       answersWithScores.length > 0
-        ? answersWithScores.reduce((sum, q) => sum + q.score, 0) /
+        ? answersWithScores.reduce((sum, q) => sum + (q.score ?? 0), 0) /
           answersWithScores.length
         : 0;
 
@@ -112,19 +131,21 @@ export async function GET(request, { params }) {
     else if (overallScore >= 6) grade = "Average";
     else if (overallScore >= 5) grade = "Below Average";
     else if (overallScore > 0) grade = "Needs Improvement";
+    const jdRaw = interviewSession.jd?.parsedData;
+    let jdData: Record<string, any> = {};
+
+    if (isJsonObject(jdRaw)) jdData = jdRaw;
+    const resumeRaw = interviewSession.resume?.parsedData;
+    let resumeData: Record<string, any> = {};
+    if (isJsonObject(resumeRaw)) resumeData = resumeRaw;
 
     const result = {
       sessionId: interviewSession.id,
-      jobRole:
-        interviewSession.jd?.parsedData?.title ||
-        interviewSession.jd?.parsedData?.jobRole ||
-        "Unknown Position",
-      experienceLevel:
-        interviewSession.jd?.parsedData?.expReq ||
-        interviewSession.jd?.parsedData?.experienceLevel ||
-        "0",
+      jobRole: jdData.title || jdData.jobRole || "Unknown Position",
+      experienceLevel: jdData.expReq || jdData.experienceLevel || "0",
+
       createdAt: interviewSession.startedAt,
-      updatedAt: interviewSession.updatedAt,
+      updatedAt: interviewSession.endedAt || interviewSession.startedAt,
       status: interviewSession.status,
       overallScore: parseFloat(overallScore.toFixed(1)),
       grade: grade,

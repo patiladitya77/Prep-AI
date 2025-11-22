@@ -1,15 +1,14 @@
-import { PrismaClient } from "@prisma/client";
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import jwt from "jsonwebtoken";
 
-const prisma = new PrismaClient();
-const JWT_SECRET = process.env.JWT_SECRET;
+import { prisma } from "../../../../lib/prisma";
+const JWT_SECRET = process.env.JWT_SECRET!;
 
 // Temporary storage for fallback mode
 const temporaryScores = new Map();
 const temporaryAnswers = new Map();
 
-export async function POST(request) {
+export async function POST(request: NextRequest) {
   try {
     const { sessionId } = await request.json();
 
@@ -33,7 +32,13 @@ export async function POST(request) {
     } catch (error) {
       return NextResponse.json({ error: "Invalid token" }, { status: 401 });
     }
-
+    //for type safety
+    if (typeof decoded === "string" || !("userId" in decoded)) {
+      return NextResponse.json(
+        { success: false, message: "Invalid token payload" },
+        { status: 401 }
+      );
+    }
     const userId = decoded.userId;
 
     // Calculate final score and update session
@@ -114,7 +119,7 @@ export async function POST(request) {
   }
 }
 
-export async function GET(request) {
+export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
     const sessionId = searchParams.get("sessionId");
@@ -139,7 +144,13 @@ export async function GET(request) {
     } catch (error) {
       return NextResponse.json({ error: "Invalid token" }, { status: 401 });
     }
-
+    //for type safety
+    if (typeof decoded === "string" || !("userId" in decoded)) {
+      return NextResponse.json(
+        { success: false, message: "Invalid token payload" },
+        { status: 401 }
+      );
+    }
     const userId = decoded.userId;
 
     // Try database first, fallback to memory store

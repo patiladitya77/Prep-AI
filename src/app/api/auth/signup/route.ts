@@ -1,7 +1,5 @@
-
-import { NextResponse } from "next/server";
-import { PrismaClient } from "@prisma/client";
-
+import { NextRequest, NextResponse } from "next/server";
+import { prisma } from "../../../../lib/prisma";
 
 import {
   hashPassword,
@@ -10,11 +8,9 @@ import {
   validateEmail,
   validatePasswordDetailed,
   validateName,
-} from "@/lib/auth/helpers"
+} from "@/lib/auth/helpers";
 
-const prisma = new PrismaClient();
-
-async function POST(request) {
+async function POST(request: NextRequest) {
   try {
     const body = await request.json();
     const { email, password, name } = body;
@@ -103,7 +99,9 @@ async function POST(request) {
         success: false,
         message: "Internal server error",
         error:
-          process.env.NODE_ENV === "development" ? error.message : undefined,
+          process.env.NODE_ENV === "development" && error instanceof Error
+            ? error.message
+            : undefined,
       },
       { status: 500 }
     );

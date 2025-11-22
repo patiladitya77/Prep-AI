@@ -1,10 +1,11 @@
-import { NextResponse } from "next/server";
-import { PrismaClient } from "@prisma/client";
+import { NextRequest, NextResponse } from "next/server";
 import { verifyToken } from "@/lib/auth/helpers.js";
+import { prisma } from "../../../../lib/prisma";
+function isJsonObject(data: unknown): data is Record<string, any> {
+  return typeof data === "object" && data !== null && !Array.isArray(data);
+}
 
-const prisma = new PrismaClient();
-
-export async function GET(request) {
+export async function GET(request: NextRequest) {
   try {
     const token = request.headers.get("authorization")?.replace("Bearer ", "");
 
@@ -19,7 +20,13 @@ export async function GET(request) {
     if (!decoded) {
       return NextResponse.json({ error: "Invalid token" }, { status: 401 });
     }
-
+    //for type safety
+    if (typeof decoded === "string" || !("userId" in decoded)) {
+      return NextResponse.json(
+        { success: false, message: "Invalid token payload" },
+        { status: 401 }
+      );
+    }
     const userId = decoded.userId;
 
     // Fetch completed interview sessions with their results
@@ -65,9 +72,9 @@ export async function GET(request) {
       const overallScore =
         answersWithScores.length > 0
           ? answersWithScores.reduce(
-            (sum, answer) => sum + (answer.score || 0),
-            0
-          ) / answersWithScores.length
+              (sum, answer) => sum + (answer.score || 0),
+              0
+            ) / answersWithScores.length
           : 0;
 
       // Determine grade
@@ -78,19 +85,19 @@ export async function GET(request) {
       else if (overallScore >= 6) grade = "Average";
       else if (overallScore >= 5) grade = "Below Average";
       else if (overallScore > 0) grade = "Needs Improvement";
+      const jdRaw = session.jd?.parsedData;
+      let jdData: Record<string, any> = {};
 
+      if (isJsonObject(jdRaw)) {
+        jdData = jdRaw;
+      }
       return {
         id: session.id,
-        jobRole:
-          session.jd?.parsedData?.title ||
-          session.jd?.parsedData?.jobRole ||
-          "Unknown Position",
-        experienceLevel:
-          session.jd?.parsedData?.expReq ||
-          session.jd?.parsedData?.experienceLevel ||
-          "0",
-        createdAt: session.endedAt || session.startedAt || session.createdAt,
-        updatedAt: session.updatedAt,
+        jobRole: jdData.title || jdData.jobRole || "Unknown Position",
+        experienceLevel: jdData.expReq || jdData.experienceLevel || "0",
+        createdAt: session.endedAt || session.startedAt,
+        updatedAt: session.endedAt || session.startedAt,
+
         overallScore: parseFloat(overallScore.toFixed(1)),
         grade: grade,
         totalQuestions: totalQuestions,

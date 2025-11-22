@@ -18,7 +18,7 @@ export default function LeftPanel() {
   const pathName = usePathname() || "/";
   const router = useRouter();
   const { user, logout } = useAuth();
-  console.log(user);
+  // console.log(user);
   const { usage, loading: usageLoading } = useUsageStats();
 
   type NavItemProps = {

@@ -1,12 +1,11 @@
-import { NextResponse } from "next/server";
-import { PrismaClient } from "@prisma/client";
-import jwt from "jsonwebtoken"
+import { NextRequest, NextResponse } from "next/server";
+import { prisma } from "../../../../lib/prisma";
+import jwt from "jsonwebtoken";
+import generateInterviewQuestions from "../../../../services/questionGeneration";
 
-
-const prisma = new PrismaClient();
 const JWT_SECRET = process.env.JWT_SECRET || "your-secret-key";
 
-async function POST(request) {
+async function POST(request: NextRequest) {
   try {
     // Get token from Authorization header (to match existing auth system)
     const authHeader = request.headers.get("authorization");
@@ -27,7 +26,13 @@ async function POST(request) {
     } catch (error) {
       return NextResponse.json({ error: "Invalid token" }, { status: 401 });
     }
-
+    //for type safety
+    if (typeof decoded === "string" || !("userId" in decoded)) {
+      return NextResponse.json(
+        { success: false, message: "Invalid token payload" },
+        { status: 401 }
+      );
+    }
     const userId = decoded.userId;
 
     // Parse the request body
@@ -116,7 +121,9 @@ async function POST(request) {
           userId: userId,
           parsedData: {
             title: jobRole,
-            skillsReq: jobDescription.split(",").map((skill) => skill.trim()),
+            skillsReq: jobDescription
+              .split(",")
+              .map((skill: string) => skill.trim()),
             expReq: expYears,
           },
         },
@@ -144,43 +151,41 @@ async function POST(request) {
         },
       });
 
-      // Automatically trigger question generation
-      console.log("🧩 Generating questions with data:", {
-        sessionId: interviewSession.id,
-        jobRole,
-        jobDescription,
-        experienceLevel: expYears,
-      });
-
       try {
-        const questionGenerationResponse = await fetch(
-          `${process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000"
-          }/api/interview/generate-questions`,
-          {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              Authorization: `Bearer ${token}`,
-            },
-            body: JSON.stringify({
-              sessionId: interviewSession.id,
-              jobDescription: jobDescription,
-              experienceLevel: expYears,
-              jobRole: jobRole,
-            }),
-          }
+        // const questionGenerationResponse = await fetch(
+        //   `${process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000"
+        //   }/api/interview/generate-questions`,
+        //   {
+        //     method: "POST",
+        //     headers: {
+        //       "Content-Type": "application/json",
+        //       Authorization: `Bearer ${token}`,
+        //     },
+        //     body: JSON.stringify({
+        //       sessionId: interviewSession.id,
+        //       jobDescription: jobDescription,
+        //       experienceLevel: expYears,
+        //       jobRole: jobRole,
+        //     }),
+        //   }
+        // );
+        const questionGenerationResponse = await generateInterviewQuestions(
+          interviewSession.id,
+          jobDescription,
+          expYears,
+          jobRole,
+          userId
         );
 
         // if (!questionGenerationResponse.ok) {
         //   console.error("Failed to generate questions automatically");
         // }
-        const questionData = await questionGenerationResponse.json();
-        if (!questionGenerationResponse.ok) {
-          console.error("Failed to generate questions automatically:", questionData);
-        } else {
-          console.log("✅ Questions generated successfully:", questionData?.questions?.length || 0);
-        }
-
+        // const questionData = await questionGenerationResponse.json();
+        // if (!questionGenerationResponse.ok) {
+        //   console.error("Failed to generate questions automatically:", questionData);
+        // } else {
+        //   console.log("✅ Questions generated successfully:", questionData?.questions?.length || 0);
+        // }
       } catch (questionError) {
         console.error("Error generating questions:", questionError);
         // Don't fail the session creation if question generation fails

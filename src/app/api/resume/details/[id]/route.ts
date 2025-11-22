@@ -1,11 +1,14 @@
-const { NextResponse } = require("next/server");
-const { PrismaClient } = require("@prisma/client");
-const jwt = require("jsonwebtoken");
+import { NextRequest, NextResponse } from "next/server";
+import jwt from "jsonwebtoken";
 
-const prisma = new PrismaClient();
-const JWT_SECRET = process.env.JWT_SECRET;
-
-export async function GET(request, { params }) {
+import { prisma } from "../../../../../lib/prisma";
+const JWT_SECRET = process.env.JWT_SECRET!;
+interface interviewParams {
+  params: Promise<{
+    id: string;
+  }>;
+}
+export async function GET(request: NextRequest, props: interviewParams) {
   try {
     // Get authorization token
     const authHeader = request.headers.get("authorization");
@@ -26,8 +29,15 @@ export async function GET(request, { params }) {
         { status: 401 }
       );
     }
-
+    //for type safety
+    if (typeof decoded === "string" || !("userId" in decoded)) {
+      return NextResponse.json(
+        { success: false, message: "Invalid token payload" },
+        { status: 401 }
+      );
+    }
     const userId = decoded.userId;
+    const params = await props.params;
     const resumeId = params.id;
 
     // Find the resume and ensure it belongs to the user

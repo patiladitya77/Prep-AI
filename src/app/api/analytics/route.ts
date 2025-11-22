@@ -1,10 +1,8 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import jwt from "jsonwebtoken";
-import { PrismaClient } from "@prisma/client";
+import { prisma } from "../../../lib/prisma";
 
-const prisma = new PrismaClient();
-
-export async function GET(request) {
+export async function GET(request: NextRequest) {
   try {
     // Check authentication
     const authHeader = request.headers.get("authorization");
@@ -18,14 +16,20 @@ export async function GET(request) {
     const token = authHeader.replace("Bearer ", "");
     let decoded;
     try {
-      decoded = jwt.verify(token, process.env.JWT_SECRET);
+      decoded = jwt.verify(token, process.env.JWT_SECRET!);
     } catch (error) {
       return NextResponse.json(
         { error: "Invalid or expired token" },
         { status: 401 }
       );
     }
-
+    //for type safety
+    if (typeof decoded === "string" || !("userId" in decoded)) {
+      return NextResponse.json(
+        { success: false, message: "Invalid token payload" },
+        { status: 401 }
+      );
+    }
     const userId = decoded.userId;
 
     // Fetch user's interview sessions with related data
@@ -77,9 +81,16 @@ export async function GET(request) {
     const skillsMap = new Map();
 
     interviewSessions.forEach((session) => {
-      if (session.jd?.parsedData?.skills) {
-        const skills = Array.isArray(session.jd.parsedData.skills)
-          ? session.jd.parsedData.skills
+      const parsed = session.jd?.parsedData;
+
+      if (
+        parsed &&
+        typeof parsed === "object" &&
+        !Array.isArray(parsed) &&
+        "skills" in parsed
+      ) {
+        const skills = Array.isArray((parsed as any).skills)
+          ? ((parsed as any).skills as string[])
           : [];
 
         skills.forEach((skill) => {
@@ -87,11 +98,11 @@ export async function GET(request) {
             skillsMap.set(skill, { scores: [], count: 0 });
           }
 
-          // Add session score for this skill
           if (session.score !== null) {
-            skillsMap.get(skill).scores.push(session.score);
+            skillsMap.get(skill)!.scores.push(session.score);
           }
-          skillsMap.get(skill).count += 1;
+
+          skillsMap.get(skill)!.count += 1;
         });
       }
     });
@@ -101,8 +112,10 @@ export async function GET(request) {
         skill,
         averageScore:
           data.scores.length > 0
-            ? data.scores.reduce((sum, score) => sum + score, 0) /
-              data.scores.length
+            ? data.scores.reduce(
+                (sum: number, score: number) => sum + score,
+                0
+              ) / data.scores.length
             : 0,
         count: data.count,
       }))
@@ -143,8 +156,10 @@ export async function GET(request) {
         interviews: data.interviews,
         averageScore:
           Array.isArray(data.scores) && data.scores.length > 0
-            ? data.scores.reduce((sum, score) => sum + score, 0) /
-              data.scores.length
+            ? data.scores.reduce(
+                (sum: number, score: number) => sum + score,
+                0
+              ) / data.scores.length
             : 0,
       }))
       .sort((a, b) => b.month.localeCompare(a.month))
@@ -154,7 +169,10 @@ export async function GET(request) {
     const totalResumeAnalyses = resumeAnalyses.length;
     const resumeAnalytics = resumeAnalyses.map((analysis) => {
       // Parse detailed scores if it's a JSON string
-      let detailedScores = {};
+      type ResumeScoreMap = Record<string, number>;
+
+      let detailedScores: ResumeScoreMap = {};
+
       try {
         detailedScores =
           typeof analysis.detailedScores === "string"
@@ -215,6 +233,7 @@ export async function GET(request) {
     const recentResumes = resumeAnalytics.slice(0, 5);
 
     // Resume skills frequency analysis from detailed scores
+
     const resumeSkillsMap = new Map();
     resumeAnalytics.forEach((analysis) => {
       if (
@@ -241,8 +260,10 @@ export async function GET(request) {
         averageScore:
           data.scores.length > 0
             ? Math.round(
-                data.scores.reduce((sum, score) => sum + score, 0) /
-                  data.scores.length
+                data.scores.reduce(
+                  (sum: number, score: number) => sum + score,
+                  0
+                ) / data.scores.length
               )
             : 0,
       }))

@@ -1,8 +1,7 @@
-import { NextResponse } from "next/server";
-import { PrismaClient } from "@prisma/client";
-import jwt from "jsonwebtoken"
+import { NextRequest, NextResponse } from "next/server";
+import { prisma } from "../../../../lib/prisma";
+import jwt from "jsonwebtoken";
 
-const prisma = new PrismaClient();
 const JWT_SECRET = process.env.JWT_SECRET || "your-secret-key";
 
 // Fallback mock questions for when database is unavailable
@@ -87,7 +86,7 @@ const fallbackQuestions = [
   },
 ];
 
-async function GET(request) {
+async function GET(request: NextRequest) {
   try {
     // Get token from Authorization header
     const authHeader = request.headers.get("authorization");
@@ -108,7 +107,13 @@ async function GET(request) {
     } catch (error) {
       return NextResponse.json({ error: "Invalid token" }, { status: 401 });
     }
-
+    //for type safety
+    if (typeof decoded === "string" || !("userId" in decoded)) {
+      return NextResponse.json(
+        { success: false, message: "Invalid token payload" },
+        { status: 401 }
+      );
+    }
     const userId = decoded.userId;
 
     // Get sessionId from URL parameters
