@@ -1,16 +1,71 @@
-## About the project
+# Prep-AI
 
-    - Prep-AI is an interview preparation web app, where user can upload resume, job role, job description, years of experience and a personalised interview session will be created based on the given details and Resume.
-    - You get analytics of the particular session and a score on scale of 10.
-    - You also get overall analytics and role-wise analytics and lot more features.
-    - Check out here:- https://prep-ai-seven-rho.vercel.app/
+Prep-AI is an AI-powered interview preparation web application that helps users practice and analyze interviews tailored to their profile.
 
-## How to run this project:
+Users can upload their resume, specify the job role, job description, and years of experience. Based on these inputs, Prep-AI generates a **personalized interview session** to closely match real-world interview scenarios.
 
-    - Open terminal
-    - Run the command => git clone https://github.com/patiladitya77/Prep-AI.git
-    - Open the project in IDE
-    - Run the command => npm install
-    - set up environment variables
-    - Run the command => npm run dev
-    - Open localhost:3000 on your desired browser
+**Live Demo:** https://prep-ai-seven-rho.vercel.app/
+
+---
+
+## Features
+
+- Resume upload for personalized question generation
+- Role-based and experience-based interview sessions
+- AI-generated interview questions
+- Session-wise analytics with a score (scale of 10)
+- Overall performance analytics
+- Role-wise analytics for deeper insights
+- Detailed feedback to improve interview readiness
+
+---
+
+## Tech Stack
+
+- Frontend,Backend: NextJS
+- AI Integration: Gemini
+- Database: Postgresql
+- Deployment: Vercel
+
+---
+
+## ⚙️ How to Run the Project Locally
+
+1. **Clone the repository**
+   ```bash
+   git clone https://github.com/patiladitya77/Prep-AI.git
+   ```
+2. **Navigate to the project directory**
+   ```bash
+   cd Prep-AI
+   ```
+3. **Install dependencies**
+   ```bash
+   npm install
+   ```
+4. **Set up environment variables**
+
+   ```bash
+
+   # Example
+   DATABASE_URL
+   JWT_SECRET
+   JWT_EXPIRES_IN
+   CORS_ORIGIN
+   GEMINI_API_KEY
+   GOOGLE_CLIENT_ID
+   GOOGLE_CLIENT_SECRET
+
+
+   ```
+
+5. **Run the development server**
+   ```bash
+   npm run dev
+   ```
+6. **Open in browser**
+
+   ```bash
+   http://localhost:3000
+   V
+   ```
