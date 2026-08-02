@@ -44,7 +44,7 @@ export async function POST(request: NextRequest) {
       console.error("❌ JSON parsing error in request body:", jsonError);
       return NextResponse.json(
         { error: "Invalid request body format" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -53,7 +53,7 @@ export async function POST(request: NextRequest) {
     if (!sessionId) {
       return NextResponse.json(
         { error: "Session ID is required" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -74,7 +74,7 @@ export async function POST(request: NextRequest) {
     if (typeof decoded === "string" || !("userId" in decoded)) {
       return NextResponse.json(
         { success: false, message: "Invalid token payload" },
-        { status: 401 }
+        { status: 401 },
       );
     }
     const userId = decoded.userId;
@@ -102,7 +102,7 @@ export async function POST(request: NextRequest) {
       if (!session || session.userId !== userId) {
         return NextResponse.json(
           { error: "Session not found or unauthorized" },
-          { status: 404 }
+          { status: 404 },
         );
       }
 
@@ -115,7 +115,7 @@ export async function POST(request: NextRequest) {
             success: false,
             message: "No answers found for this session",
           },
-          { status: 400 }
+          { status: 400 },
         );
       }
 
@@ -124,7 +124,7 @@ export async function POST(request: NextRequest) {
 
       for (const question of session.questions) {
         const answer = session.answers.find(
-          (a) => a.questionId === question.id
+          (a) => a.questionId === question.id,
         );
 
         if (answer) {
@@ -132,7 +132,7 @@ export async function POST(request: NextRequest) {
           const aiResult = await generateFeedbackAndScore(
             question.questionText,
             answer.candidateAnswer,
-            session
+            session,
           );
 
           // Store the score back to database
@@ -162,7 +162,7 @@ export async function POST(request: NextRequest) {
       // Calculate overall score
       const totalScore = questionResults.reduce(
         (sum, result) => sum + result.score,
-        0
+        0,
       );
       const averageScore = totalScore / questionResults.length;
       const completionPercentage = (answeredQuestions / totalQuestions) * 100;
@@ -191,7 +191,7 @@ export async function POST(request: NextRequest) {
         questionResults,
         overallFeedback: generateOverallFeedback(
           averageScore,
-          completionPercentage
+          completionPercentage,
         ),
         jobRole: jdData.jobRole ?? "Software Developer",
 
@@ -200,7 +200,7 @@ export async function POST(request: NextRequest) {
     } catch (dbError) {
       console.error(
         "❌ Database unavailable, using fallback calculation:",
-        dbError
+        dbError,
       );
 
       // Calculate from temporary storage
@@ -218,7 +218,7 @@ export async function POST(request: NextRequest) {
             success: false,
             message: "No answers found for this session",
           },
-          { status: 400 }
+          { status: 400 },
         );
       }
 
@@ -244,7 +244,7 @@ export async function POST(request: NextRequest) {
 
       const totalScore = questionResults.reduce(
         (sum, result) => sum + result.score,
-        0
+        0,
       );
       const averageScore = totalScore / questionResults.length;
 
@@ -278,7 +278,7 @@ export async function POST(request: NextRequest) {
     console.error("❌ Error finishing interview:", error);
     return NextResponse.json(
       { error: "Internal server error" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
@@ -294,9 +294,9 @@ function getGrade(score: number) {
 function generateOverallFeedback(score: number, completion: number) {
   const grade = getGrade(score);
   let feedback = `You completed ${completion.toFixed(
-    0
+    0,
   )}% of the interview with an overall score of ${score.toFixed(
-    1
+    1,
   )}/10 (${grade}). `;
 
   if (score >= 8) {
@@ -364,7 +364,7 @@ function getFallbackScore(answer: string) {
 async function generateFeedbackAndScore(
   questionText: string,
   answer: string,
-  session: any
+  session: any,
 ) {
   try {
     // Check if Gemini API is available and rate limit
@@ -379,7 +379,7 @@ async function generateFeedbackAndScore(
       return getFallbackScore(answer);
     }
 
-    const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash-exp" });
+    const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash-exp" });
 
     // Get context about the job and candidate
     let contextInfo = "";
@@ -446,7 +446,7 @@ async function generateFeedbackAndScore(
     const result = await Promise.race<any>([
       model.generateContent(prompt),
       new Promise((_, reject) =>
-        setTimeout(() => reject(new Error("API timeout")), 15000)
+        setTimeout(() => reject(new Error("API timeout")), 15000),
       ),
     ]);
 

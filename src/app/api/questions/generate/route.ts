@@ -88,18 +88,18 @@ export async function POST(request: NextRequest) {
     if (!category || !categoryPrompts[category as QuestionCategory]) {
       return NextResponse.json(
         { error: "Invalid category provided" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
     if (!process.env.GEMINI_API_KEY) {
       return NextResponse.json(
         { error: "Gemini API key not configured" },
-        { status: 500 }
+        { status: 500 },
       );
     }
 
-    const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
+    const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
 
     const prompt = `${categoryPrompts[category as QuestionCategory]}
 
@@ -154,7 +154,7 @@ Return only valid JSON format.`;
             timeEstimates[Math.floor(Math.random() * timeEstimates.length)],
           tags: generateTags(q.question, category),
           isFavorite: false,
-        })
+        }),
       );
 
       return NextResponse.json({
@@ -169,7 +169,7 @@ Return only valid JSON format.`;
 
       // Fallback: create some default questions if AI response is malformed
       const fallbackQuestions = getFallbackQuestions(
-        category as QuestionCategory
+        category as QuestionCategory,
       );
 
       return NextResponse.json({
@@ -185,7 +185,7 @@ Return only valid JSON format.`;
 
     // Return fallback questions in case of any error
     const fallbackQuestions = getFallbackQuestions(
-      (request as any).category || "frontend"
+      (request as any).category || "frontend",
     );
 
     return NextResponse.json({

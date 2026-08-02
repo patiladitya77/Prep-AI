@@ -8,7 +8,10 @@ const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
 // Function to extract text from PDF using Gemini Vision API
 async function extractTextFromPDFWithAI(buffer: Buffer) {
   try {
-    const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
+    console.log("📄 Starting PDF text extraction...");
+    console.log("   Buffer size:", buffer.length, "bytes");
+
+    const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
 
     const prompt = `
       Please extract all text content from this PDF document. 
@@ -16,6 +19,7 @@ async function extractTextFromPDFWithAI(buffer: Buffer) {
       This appears to be a resume/CV document.
     `;
 
+    console.log("   Calling Gemini API for text extraction...");
     const result = await model.generateContent([
       prompt,
       {
@@ -27,23 +31,43 @@ async function extractTextFromPDFWithAI(buffer: Buffer) {
     ]);
 
     const extractedText = result.response.text();
-    // Log extracted text length for debugging
-    console.log(
-      "📄 PDF text extracted, length:",
-      extractedText.length,
-      "chars"
-    );
+    console.log("✅ PDF text extracted successfully");
+    console.log("   Extracted text length:", extractedText.length, "chars");
+    console.log("   First 200 chars:", extractedText.substring(0, 200));
     return extractedText;
   } catch (error) {
+    console.error("❌ PDF text extraction failed:");
+    console.error(
+      "   Error type:",
+      error instanceof Error ? error.constructor.name : typeof error,
+    );
+    console.error(
+      "   Error message:",
+      error instanceof Error ? error.message : String(error),
+    );
+    console.error("   Full error:", error);
     // Fallback to basic text
     return "PDF content extraction failed - proceeding with filename analysis";
   }
 }
 
 // Helper function to parse resume using Gemini AI
-async function parseResumeWithAI(resumeText: string) {
+async function parseResumeWithAI(
+  resumeText: string,
+  retryCount = 0,
+): Promise<any> {
+  const maxRetries = 2;
+  const retryDelay = (attempt: number) =>
+    Math.min(1000 * Math.pow(2, attempt), 10000);
+
   try {
-    const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
+    console.log("🧠 Starting AI resume parsing...");
+    console.log("   Input text length:", resumeText.length, "chars");
+    if (retryCount > 0) {
+      console.log(`   Retry attempt: ${retryCount}/${maxRetries}`);
+    }
+
+    const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
 
     const prompt = `
       You are an expert resume parser. Parse the following resume text and extract structured information.
@@ -90,14 +114,57 @@ async function parseResumeWithAI(resumeText: string) {
       Only return the JSON object, no additional text.
     `;
 
+    console.log("   Calling Gemini API for parsing...");
     const result = await model.generateContent(prompt);
-    const response = await result.response;
+    const response = result.response;
     const text = response.text();
+
+    console.log("   Raw AI response length:", text.length, "chars");
+    console.log("   Raw AI response preview:", text.substring(0, 300));
 
     // Clean and parse the response
     const cleanedText = text.replace(/```json\n?|\n?```/g, "").trim();
-    return JSON.parse(cleanedText);
-  } catch (error) {
+    console.log("   Cleaned response length:", cleanedText.length, "chars");
+
+    const parsedData = JSON.parse(cleanedText);
+    console.log("✅ Resume parsed successfully:");
+    console.log("   Name:", parsedData.name || "N/A");
+    console.log("   Email:", parsedData.email || "N/A");
+    console.log("   Skills count:", parsedData.skills?.length || 0);
+    console.log("   Projects count:", parsedData.projects?.length || 0);
+    console.log("   Experience count:", parsedData.experience?.length || 0);
+    console.log("   Education count:", parsedData.education?.length || 0);
+
+    return parsedData;
+  } catch (error: any) {
+    console.error("❌ AI resume parsing failed:");
+    console.error(
+      "   Error type:",
+      error instanceof Error ? error.constructor.name : typeof error,
+    );
+    console.error(
+      "   Error message:",
+      error instanceof Error ? error.message : String(error),
+    );
+    if (error instanceof SyntaxError) {
+      console.error("   JSON parsing failed - AI response was not valid JSON");
+    }
+
+    // Check if it's a rate limit error and retry
+    const isRateLimitError =
+      error?.status === 429 ||
+      error?.message?.includes("quota") ||
+      error?.message?.includes("rate limit");
+
+    if (isRateLimitError && retryCount < maxRetries) {
+      const delay = retryDelay(retryCount);
+      console.log(`⏳ Rate limit hit, retrying in ${delay}ms...`);
+      await new Promise((resolve) => setTimeout(resolve, delay));
+      return parseResumeWithAI(resumeText, retryCount + 1);
+    }
+
+    console.error("   Full error:", error);
+
     // Return basic structure if AI parsing fails
     return {
       name: "",
@@ -120,7 +187,7 @@ async function POST(request: NextRequest) {
     if (!authHeader || !authHeader.startsWith("Bearer ")) {
       return NextResponse.json(
         { error: "Unauthorized - No token provided" },
-        { status: 401 }
+        { status: 401 },
       );
     }
 
@@ -137,7 +204,7 @@ async function POST(request: NextRequest) {
     if (typeof decoded === "string" || !("userId" in decoded)) {
       return NextResponse.json(
         { success: false, message: "Invalid token payload" },
-        { status: 401 }
+        { status: 401 },
       );
     }
     const userId = decoded.userId;
@@ -162,7 +229,7 @@ async function POST(request: NextRequest) {
       } catch (createError) {
         return NextResponse.json(
           { error: "User account issue - please login again" },
-          { status: 401 }
+          { status: 401 },
         );
       }
     }
@@ -173,7 +240,7 @@ async function POST(request: NextRequest) {
     if (!file) {
       return NextResponse.json(
         { error: "No resume file provided" },
-        { status: 400 }
+        { status: 400 },
       );
     }
     const fileName = formData.get("fileName");
@@ -182,7 +249,7 @@ async function POST(request: NextRequest) {
     if (!file) {
       return NextResponse.json(
         { error: "No resume file provided" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -191,23 +258,20 @@ async function POST(request: NextRequest) {
     const buffer: Buffer = Buffer.from(arrayBuffer);
 
     // Extract text from PDF using AI
-    // console.log("🔄 Extracting text from PDF using Gemini AI...");
+    console.log("🔄 Starting resume processing pipeline...");
+    console.log("   File name:", fileNameStr);
+    console.log("   File size:", buffer.length, "bytes");
+
     const extractedText = await extractTextFromPDFWithAI(buffer);
 
     // Parse the extracted text with AI
-    // console.log("🧠 Parsing extracted text with AI...");
     let parsedData;
     try {
       parsedData = await parseResumeWithAI(extractedText);
-      // console.log("✅ Resume parsed successfully:", {
-      //   name: parsedData.name || "N/A",
-      //   skills: parsedData.skills?.length || 0,
-      //   projects: parsedData.projects?.length || 0,
-      //   experience: parsedData.experience?.length || 0,
-      //   education: parsedData.education?.length || 0,
-      // });
+      console.log("✅ Resume processing completed successfully");
     } catch (aiError) {
-      console.error("❌ AI parsing failed:", aiError);
+      console.error("❌ Resume processing failed with error:");
+      console.error("   Error:", aiError);
       // Fallback parsed data if AI fails
       parsedData = {
         name: "Resume Uploaded",
@@ -233,10 +297,12 @@ async function POST(request: NextRequest) {
         summary:
           "Resume uploaded successfully. Interview questions will be generated based on job description and general professional experience.",
       };
+      console.log("⚠️  Using fallback parsed data");
     }
 
     // Store resume in database
     try {
+      console.log("💾 Saving resume to database...");
       const resume = await prisma.resume.create({
         data: {
           userId: userId,
@@ -253,6 +319,8 @@ async function POST(request: NextRequest) {
           },
         },
       });
+
+      console.log("✅ Resume saved to database with ID:", resume.id);
 
       return NextResponse.json({
         success: true,
@@ -271,18 +339,42 @@ async function POST(request: NextRequest) {
         },
       });
     } catch (dbError) {
+      console.error("❌ Database save failed:");
+      console.error(
+        "   Error type:",
+        dbError instanceof Error ? dbError.constructor.name : typeof dbError,
+      );
+      console.error(
+        "   Error message:",
+        dbError instanceof Error ? dbError.message : String(dbError),
+      );
+      console.error("   Full error:", dbError);
       return NextResponse.json(
         { error: "Failed to save resume to database" },
-        { status: 500 }
+        { status: 500 },
       );
     }
   } catch (error) {
-    console.error("Server error:", error);
+    console.error("❌ Resume upload route error:");
+    console.error(
+      "   Error type:",
+      error instanceof Error ? error.constructor.name : typeof error,
+    );
+    console.error(
+      "   Error message:",
+      error instanceof Error ? error.message : String(error),
+    );
+    console.error(
+      "   Stack trace:",
+      error instanceof Error ? error.stack : "N/A",
+    );
+    console.error("   Full error object:", error);
+
     const message =
       error instanceof Error ? error.message : "Unexpected error occurred";
     return NextResponse.json(
       { error: "Internal server error: " + message },
-      { status: 500 }
+      { status: 500 },
     );
   } finally {
     // keep Prisma client alive across requests in dev/server mode
@@ -298,7 +390,7 @@ async function GET(request: NextRequest) {
     if (!authHeader || !authHeader.startsWith("Bearer ")) {
       return NextResponse.json(
         { error: "Unauthorized - No token provided" },
-        { status: 401 }
+        { status: 401 },
       );
     }
 
@@ -315,7 +407,7 @@ async function GET(request: NextRequest) {
     if (typeof decoded === "string" || !("userId" in decoded)) {
       return NextResponse.json(
         { success: false, message: "Invalid token payload" },
-        { status: 401 }
+        { status: 401 },
       );
     }
     const userId = decoded.userId;
@@ -341,7 +433,7 @@ async function GET(request: NextRequest) {
     console.error("Server error:", error);
     return NextResponse.json(
       { error: "Internal server error" },
-      { status: 500 }
+      { status: 500 },
     );
   } finally {
     await prisma.$disconnect();

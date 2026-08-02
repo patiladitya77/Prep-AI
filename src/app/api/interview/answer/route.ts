@@ -39,7 +39,7 @@ export async function POST(request: NextRequest) {
     if (!sessionId || !questionId || !answer) {
       return NextResponse.json(
         { error: "Session ID, Question ID, and answer are required" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -60,7 +60,7 @@ export async function POST(request: NextRequest) {
     if (typeof decoded === "string" || !("userId" in decoded)) {
       return NextResponse.json(
         { success: false, message: "Invalid token payload" },
-        { status: 401 }
+        { status: 401 },
       );
     }
     const userId = decoded.userId;
@@ -86,7 +86,7 @@ export async function POST(request: NextRequest) {
       if (!session || session.userId !== userId) {
         return NextResponse.json(
           { error: "Session not found or unauthorized" },
-          { status: 404 }
+          { status: 404 },
         );
       }
 
@@ -97,7 +97,7 @@ export async function POST(request: NextRequest) {
       if (!question || question.sessionId !== sessionId) {
         return NextResponse.json(
           { error: "Question not found in this session" },
-          { status: 404 }
+          { status: 404 },
         );
       }
 
@@ -132,7 +132,7 @@ export async function POST(request: NextRequest) {
     } catch (dbError) {
       console.error(
         "❌ Database unavailable, using fallback storage:",
-        dbError
+        dbError,
       );
       // Use temporary storage as fallback
       const answerId = `${sessionId}_${questionId}`;
@@ -163,7 +163,7 @@ export async function POST(request: NextRequest) {
     console.error("❌ Error saving answer:", error);
     return NextResponse.json(
       { error: "Internal server error" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
@@ -199,7 +199,7 @@ function getFallbackScore(answer: string) {
 async function generateFeedbackAndScore(
   questionText: string,
   answer: string,
-  session: any
+  session: any,
 ) {
   try {
     // Check if Gemini API is available and rate limit
@@ -214,7 +214,7 @@ async function generateFeedbackAndScore(
       return getFallbackScore(answer);
     }
 
-    const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
+    const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
 
     // Get context about the job and candidate
     let contextInfo = "";
@@ -235,7 +235,7 @@ async function generateFeedbackAndScore(
           ? resumeData.experience
               .map(
                 (exp: { position?: string; company?: string }) =>
-                  `${exp.position} at ${exp.company}`
+                  `${exp.position} at ${exp.company}`,
               )
               .join("; ")
           : "N/A"
@@ -282,7 +282,7 @@ async function generateFeedbackAndScore(
     const result = await Promise.race([
       model.generateContent(prompt),
       new Promise((_, reject) =>
-        setTimeout(() => reject(new Error("API timeout")), 10000)
+        setTimeout(() => reject(new Error("API timeout")), 10000),
       ),
     ]);
     if (

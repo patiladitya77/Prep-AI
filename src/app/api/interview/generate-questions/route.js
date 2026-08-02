@@ -17,7 +17,7 @@ async function POST(request) {
     if (!authHeader || !authHeader.startsWith("Bearer ")) {
       return NextResponse.json(
         { error: "Unauthorized - No token provided" },
-        { status: 401 }
+        { status: 401 },
       );
     }
 
@@ -56,7 +56,7 @@ async function POST(request) {
           error:
             "Missing required fields: sessionId, jobDescription, experienceLevel, jobRole",
         },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -75,7 +75,7 @@ async function POST(request) {
     if (!session) {
       return NextResponse.json(
         { error: "Interview session not found or unauthorized" },
-        { status: 404 }
+        { status: 404 },
       );
     }
 
@@ -97,7 +97,7 @@ async function POST(request) {
     // Processing interview setup for the specified role and experience level
 
     try {
-      const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
+      const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
 
       // Prepare resume data for the prompt
       let resumeInfo = "";
@@ -106,40 +106,47 @@ async function POST(request) {
         resumeInfo = `
         Resume Information:
         - Name: ${resumeData.name || "N/A"}
-        - Skills: ${Array.isArray(resumeData.skills)
+        - Skills: ${
+          Array.isArray(resumeData.skills)
             ? resumeData.skills.join(", ")
             : "N/A"
-          }
-        - Experience: ${Array.isArray(resumeData.experience)
+        }
+        - Experience: ${
+          Array.isArray(resumeData.experience)
             ? resumeData.experience
-              .map(
-                (exp) => `${exp.position} at ${exp.company} (${exp.duration})`
-              )
-              .join("; ")
+                .map(
+                  (exp) =>
+                    `${exp.position} at ${exp.company} (${exp.duration})`,
+                )
+                .join("; ")
             : "N/A"
-          }
-        - Projects: ${Array.isArray(resumeData.projects)
+        }
+        - Projects: ${
+          Array.isArray(resumeData.projects)
             ? resumeData.projects
-              .map(
-                (proj) =>
-                  `${proj.name || proj.title}: ${proj.description || ""
-                  } (Technologies: ${Array.isArray(proj.technologies)
-                    ? proj.technologies.join(", ")
-                    : proj.tech || "N/A"
-                  })`
-              )
-              .join("; ")
+                .map(
+                  (proj) =>
+                    `${proj.name || proj.title}: ${
+                      proj.description || ""
+                    } (Technologies: ${
+                      Array.isArray(proj.technologies)
+                        ? proj.technologies.join(", ")
+                        : proj.tech || "N/A"
+                    })`,
+                )
+                .join("; ")
             : "N/A"
-          }
-        - Education: ${Array.isArray(resumeData.education)
+        }
+        - Education: ${
+          Array.isArray(resumeData.education)
             ? resumeData.education
-              .map(
-                (edu) =>
-                  `${edu.degree} in ${edu.field} from ${edu.institution}`
-              )
-              .join("; ")
+                .map(
+                  (edu) =>
+                    `${edu.degree} in ${edu.field} from ${edu.institution}`,
+                )
+                .join("; ")
             : "N/A"
-          }
+        }
         - Summary: ${resumeData.summary || "N/A"}
         `;
       } else {
@@ -261,7 +268,7 @@ async function POST(request) {
               type: "technical",
               difficulty: "medium",
               focus_area: "Frontend Development",
-            }
+            },
           );
         } else if (
           jobRole.toLowerCase().includes("backend") ||
@@ -280,7 +287,7 @@ async function POST(request) {
               type: "technical",
               difficulty: "medium",
               focus_area: "Database Management",
-            }
+            },
           );
         } else if (
           jobRole.toLowerCase().includes("fullstack") ||
@@ -298,7 +305,7 @@ async function POST(request) {
               type: "technical",
               difficulty: "medium",
               focus_area: "Full-Stack Architecture",
-            }
+            },
           );
         } else {
           // Generic technical questions
@@ -314,7 +321,7 @@ async function POST(request) {
               type: "technical",
               difficulty: "medium",
               focus_area: "Technical Learning",
-            }
+            },
           );
         }
 
@@ -339,7 +346,7 @@ async function POST(request) {
               type: "behavioral",
               difficulty: "easy",
               focus_area: "Learning & Growth",
-            }
+            },
           );
         } else if (parseInt(experienceLevel) <= 5) {
           // Mid-level questions
@@ -361,7 +368,7 @@ async function POST(request) {
               type: "behavioral",
               difficulty: "medium",
               focus_area: "Mentoring & Collaboration",
-            }
+            },
           );
         } else {
           // Senior level questions
@@ -383,7 +390,7 @@ async function POST(request) {
               type: "behavioral",
               difficulty: "hard",
               focus_area: "Strategic Planning",
-            }
+            },
           );
         }
 
@@ -406,7 +413,7 @@ async function POST(request) {
             type: "behavioral",
             difficulty: "easy",
             focus_area: "Professional Development",
-          }
+          },
         );
 
         questionsData = {
@@ -515,7 +522,7 @@ async function POST(request) {
     console.error("Server error:", error);
     return NextResponse.json(
       { error: "Internal server error" },
-      { status: 500 }
+      { status: 500 },
     );
   } finally {
     // keep Prisma client alive across requests in dev/server mode
