@@ -54,7 +54,7 @@ export async function GET(request: NextRequest) {
       };
     } else {
       limits = {
-        interviews: 4,
+        interviews: 5,
         resumes: 6,
       };
     }

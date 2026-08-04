@@ -173,7 +173,10 @@ const InterviewSetup: React.FC<InterviewSetupProps> = ({ interviewId }) => {
           );
           // await navigation so we don't clear the creating state prematurely
           // (keeps the full-screen loading visible until the router finishes)
-          await router.push(`/interview/${data.data.sessionId}?session=active`);
+          await router.push(
+            `/interview/${data.data.sessionId}?status=preparing`
+          );
+
           // navigation initiated; nothing more to do here
           return;
         }
