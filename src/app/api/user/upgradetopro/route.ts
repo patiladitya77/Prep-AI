@@ -1,36 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
-import jwt from "jsonwebtoken";
 import { PrismaClient } from "@prisma/client";
+import { requireAuth } from "@/lib/auth/requireAuth";
 
 const prisma = new PrismaClient();
 export async function POST(request: NextRequest) {
   try {
-    const token = request.headers.get("authorization")?.replace("Bearer ", "");
-
-    if (!token) {
-      return NextResponse.json(
-        { error: "Authorization token required" },
-        { status: 401 }
-      );
-    }
-
-    const decoded = jwt.verify(token, process.env.JWT_SECRET!);
-    if (!decoded) {
-      return NextResponse.json({ error: "Invalid token" }, { status: 401 });
-    }
-    //for type safety
-    if (typeof decoded === "string" || !("userId" in decoded)) {
-      return NextResponse.json(
-        { success: false, message: "Invalid token payload" },
-        { status: 401 }
-      );
-    }
-    const userId = decoded.userId;
+    const auth = requireAuth(request);
+    if (auth instanceof NextResponse) return auth;
+    const { userId } = auth;
     const user = await prisma.user.findUnique({
       where: { id: userId },
-      select: {
-        isPremium: true,
-      },
+      select: { isPremium: true },
     });
 
     if (!user) {
@@ -47,7 +27,7 @@ export async function POST(request: NextRequest) {
     console.error("❌ Error fetching completed interviews:", error);
     return NextResponse.json(
       { error: "Internal server error" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

@@ -1,36 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
-import jwt from "jsonwebtoken";
 import { prisma } from "../../../lib/prisma";
+import { requireAuth } from "@/lib/auth/requireAuth";
 
 export async function GET(request: NextRequest) {
   try {
-    // Check authentication
-    const authHeader = request.headers.get("authorization");
-    if (!authHeader) {
-      return NextResponse.json(
-        { error: "No authorization token provided" },
-        { status: 401 }
-      );
-    }
-
-    const token = authHeader.replace("Bearer ", "");
-    let decoded;
-    try {
-      decoded = jwt.verify(token, process.env.JWT_SECRET!);
-    } catch (error) {
-      return NextResponse.json(
-        { error: "Invalid or expired token" },
-        { status: 401 }
-      );
-    }
-    //for type safety
-    if (typeof decoded === "string" || !("userId" in decoded)) {
-      return NextResponse.json(
-        { success: false, message: "Invalid token payload" },
-        { status: 401 }
-      );
-    }
-    const userId = decoded.userId;
+    const auth = requireAuth(request);
+    if (auth instanceof NextResponse) return auth;
+    const { userId } = auth;
 
     // Fetch user's interview sessions with related data
     const interviewSessions = await prisma.interviewSession.findMany({
@@ -53,18 +29,18 @@ export async function GET(request: NextRequest) {
     // Calculate analytics
     const totalInterviews = interviewSessions.length;
     const completedInterviews = interviewSessions.filter(
-      (session) => session.status === "COMPLETED"
+      (session) => session.status === "COMPLETED",
     ).length;
 
     // Calculate average score
     const completedSessionsWithScores = interviewSessions.filter(
-      (session) => session.status === "COMPLETED" && session.score !== null
+      (session) => session.status === "COMPLETED" && session.score !== null,
     );
     const averageScore =
       completedSessionsWithScores.length > 0
         ? completedSessionsWithScores.reduce(
             (sum, session) => sum + (session.score || 0),
-            0
+            0,
           ) / completedSessionsWithScores.length
         : 0;
 
@@ -114,7 +90,7 @@ export async function GET(request: NextRequest) {
           data.scores.length > 0
             ? data.scores.reduce(
                 (sum: number, score: number) => sum + score,
-                0
+                0,
               ) / data.scores.length
             : 0,
         count: data.count,
@@ -129,7 +105,7 @@ export async function GET(request: NextRequest) {
     interviewSessions.forEach((session) => {
       const sessionDate = new Date(session.startedAt);
       const monthKey = `${sessionDate.getFullYear()}-${String(
-        sessionDate.getMonth() + 1
+        sessionDate.getMonth() + 1,
       ).padStart(2, "0")}`;
       const monthName = sessionDate.toLocaleDateString("en-US", {
         month: "long",
@@ -158,7 +134,7 @@ export async function GET(request: NextRequest) {
           Array.isArray(data.scores) && data.scores.length > 0
             ? data.scores.reduce(
                 (sum: number, score: number) => sum + score,
-                0
+                0,
               ) / data.scores.length
             : 0,
       }))
@@ -219,13 +195,13 @@ export async function GET(request: NextRequest) {
 
     // Calculate average resume score
     const resumesWithScores = resumeAnalytics.filter(
-      (resume) => resume.score !== null
+      (resume) => resume.score !== null,
     );
     const averageResumeScore =
       resumesWithScores.length > 0
         ? Math.round(
             resumesWithScores.reduce((sum, resume) => sum + resume.score, 0) /
-              resumesWithScores.length
+              resumesWithScores.length,
           )
         : 0;
 
@@ -262,8 +238,8 @@ export async function GET(request: NextRequest) {
             ? Math.round(
                 data.scores.reduce(
                   (sum: number, score: number) => sum + score,
-                  0
-                ) / data.scores.length
+                  0,
+                ) / data.scores.length,
               )
             : 0,
       }))
@@ -294,7 +270,7 @@ export async function GET(request: NextRequest) {
     console.error("Analytics error:", error);
     return NextResponse.json(
       { error: "Internal server error" },
-      { status: 500 }
+      { status: 500 },
     );
   } finally {
     // keep Prisma client alive across requests in dev/server mode

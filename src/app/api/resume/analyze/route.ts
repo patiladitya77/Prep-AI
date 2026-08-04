@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import jwt from "jsonwebtoken";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { prisma } from "../../../../lib/prisma";
+import { requireAuth } from "@/lib/auth/requireAuth";
 
 // Initialize Gemini AI and Prisma
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
@@ -42,33 +42,9 @@ async function extractTextFromPDFWithAI(buffer: Buffer) {
 
 export async function POST(request: NextRequest) {
   try {
-    // Check authentication
-    const authHeader = request.headers.get("authorization");
-    if (!authHeader) {
-      return NextResponse.json(
-        { error: "No authorization token provided" },
-        { status: 401 },
-      );
-    }
-
-    const token = authHeader.replace("Bearer ", "");
-    let decoded;
-    try {
-      decoded = jwt.verify(token, process.env.JWT_SECRET!);
-    } catch (error) {
-      return NextResponse.json(
-        { error: "Invalid or expired token" },
-        { status: 401 },
-      );
-    }
-    if (!decoded || typeof decoded !== "object" || !("userId" in decoded)) {
-      return NextResponse.json(
-        { error: "Invalid token payload" },
-        { status: 401 },
-      );
-    }
-
-    const userId = decoded.userId as string;
+    const auth = requireAuth(request);
+    if (auth instanceof NextResponse) return auth;
+    const { userId } = auth as { userId: string };
 
     // Parse the form data
     const formData = await request.formData();
@@ -339,7 +315,7 @@ Please ensure all scores are realistic and constructive. Provide specific, actio
         try {
           await prisma.resumeAnalysis.create({
             data: {
-              userId: decoded.userId,
+              userId: userId,
               fileName: resumeFile.name || "analyzed_resume.pdf",
               analysisType: "PDF",
               overallScore: analysis.overallScore,

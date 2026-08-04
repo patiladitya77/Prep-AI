@@ -1,8 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import jwt from "jsonwebtoken";
-
 import { prisma } from "../../../../lib/prisma";
-const JWT_SECRET = process.env.JWT_SECRET!;
+import { requireAuth } from "@/lib/auth/requireAuth";
 
 // Temporary storage for fallback mode
 const temporaryScores = new Map();
@@ -15,31 +13,14 @@ export async function POST(request: NextRequest) {
     if (!sessionId) {
       return NextResponse.json(
         { error: "Session ID is required" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
     // Verify authentication
-    const authHeader = request.headers.get("authorization");
-    if (!authHeader || !authHeader.startsWith("Bearer ")) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    const token = authHeader.split(" ")[1];
-    let decoded;
-    try {
-      decoded = jwt.verify(token, JWT_SECRET);
-    } catch (error) {
-      return NextResponse.json({ error: "Invalid token" }, { status: 401 });
-    }
-    //for type safety
-    if (typeof decoded === "string" || !("userId" in decoded)) {
-      return NextResponse.json(
-        { success: false, message: "Invalid token payload" },
-        { status: 401 }
-      );
-    }
-    const userId = decoded.userId;
+    const auth = requireAuth(request);
+    if (auth instanceof NextResponse) return auth;
+    const { userId } = auth;
 
     // Calculate final score and update session
     let sessionData;
@@ -58,7 +39,7 @@ export async function POST(request: NextRequest) {
       if (!session || session.userId !== userId) {
         return NextResponse.json(
           { error: "Session not found or unauthorized" },
-          { status: 404 }
+          { status: 404 },
         );
       }
 
@@ -83,7 +64,7 @@ export async function POST(request: NextRequest) {
     } catch (dbError) {
       console.error(
         "❌ Database unavailable, using fallback calculation:",
-        dbError
+        dbError,
       );
 
       // Calculate from temporary storage
@@ -114,7 +95,7 @@ export async function POST(request: NextRequest) {
     console.error("❌ Error calculating score:", error);
     return NextResponse.json(
       { error: "Internal server error" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
@@ -127,31 +108,14 @@ export async function GET(request: NextRequest) {
     if (!sessionId) {
       return NextResponse.json(
         { error: "Session ID is required" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
     // Verify authentication
-    const authHeader = request.headers.get("authorization");
-    if (!authHeader || !authHeader.startsWith("Bearer ")) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    const token = authHeader.split(" ")[1];
-    let decoded;
-    try {
-      decoded = jwt.verify(token, JWT_SECRET);
-    } catch (error) {
-      return NextResponse.json({ error: "Invalid token" }, { status: 401 });
-    }
-    //for type safety
-    if (typeof decoded === "string" || !("userId" in decoded)) {
-      return NextResponse.json(
-        { success: false, message: "Invalid token payload" },
-        { status: 401 }
-      );
-    }
-    const userId = decoded.userId;
+    const auth = requireAuth(request);
+    if (auth instanceof NextResponse) return auth;
+    const { userId } = auth;
 
     // Try database first, fallback to memory store
     let sessionData;
@@ -170,7 +134,7 @@ export async function GET(request: NextRequest) {
       if (!session || session.userId !== userId) {
         return NextResponse.json(
           { error: "Session not found or unauthorized" },
-          { status: 404 }
+          { status: 404 },
         );
       }
 
@@ -189,7 +153,7 @@ export async function GET(request: NextRequest) {
     } catch (dbError) {
       console.error(
         "❌ Database unavailable, using fallback storage:",
-        dbError
+        dbError,
       );
 
       // Calculate from temporary storage
@@ -227,7 +191,7 @@ export async function GET(request: NextRequest) {
     console.error("❌ Error getting score:", error);
     return NextResponse.json(
       { error: "Internal server error" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

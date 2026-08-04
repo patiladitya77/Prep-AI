@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { GoogleGenerativeAI } from "@google/generative-ai";
-import jwt from "jsonwebtoken";
 import { prisma } from "../../../../lib/prisma";
-const JWT_SECRET = process.env.JWT_SECRET!;
+import { requireAuth } from "@/lib/auth/requireAuth";
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
 
 // Function to extract text from PDF using Gemini Vision API
@@ -181,33 +180,9 @@ async function parseResumeWithAI(
 
 async function POST(request: NextRequest) {
   try {
-    // Get token from Authorization header
-    const authHeader = request.headers.get("authorization");
-
-    if (!authHeader || !authHeader.startsWith("Bearer ")) {
-      return NextResponse.json(
-        { error: "Unauthorized - No token provided" },
-        { status: 401 },
-      );
-    }
-
-    const token = authHeader.substring(7);
-
-    // Verify the JWT token
-    let decoded;
-    try {
-      decoded = jwt.verify(token, JWT_SECRET);
-    } catch (error) {
-      return NextResponse.json({ error: "Invalid token" }, { status: 401 });
-    }
-    //for type safety
-    if (typeof decoded === "string" || !("userId" in decoded)) {
-      return NextResponse.json(
-        { success: false, message: "Invalid token payload" },
-        { status: 401 },
-      );
-    }
-    const userId = decoded.userId;
+    const auth = requireAuth(request);
+    if (auth instanceof NextResponse) return auth;
+    const { userId } = auth;
     // User authenticated with ID: ${userId}
 
     // Verify user exists in database, create if not found (temporary fix)
@@ -221,9 +196,9 @@ async function POST(request: NextRequest) {
         user = await prisma.user.create({
           data: {
             id: userId,
-            email: decoded.email || `user-${userId}@temp.com`,
-            passwordHash: "temp-hash", // This is a placeholder
-            name: decoded.name || "User",
+            email: `user-${userId}@temp.com`,
+            passwordHash: "temp-hash",
+            name: "User",
           },
         });
       } catch (createError) {
@@ -384,35 +359,9 @@ async function POST(request: NextRequest) {
 // GET method to retrieve user's resumes
 async function GET(request: NextRequest) {
   try {
-    // Get token from Authorization header
-    const authHeader = request.headers.get("authorization");
-
-    if (!authHeader || !authHeader.startsWith("Bearer ")) {
-      return NextResponse.json(
-        { error: "Unauthorized - No token provided" },
-        { status: 401 },
-      );
-    }
-
-    const token = authHeader.substring(7);
-
-    // Verify the JWT token
-    let decoded;
-    try {
-      decoded = jwt.verify(token, JWT_SECRET);
-    } catch (error) {
-      return NextResponse.json({ error: "Invalid token" }, { status: 401 });
-    }
-    //for type safety
-    if (typeof decoded === "string" || !("userId" in decoded)) {
-      return NextResponse.json(
-        { success: false, message: "Invalid token payload" },
-        { status: 401 },
-      );
-    }
-    const userId = decoded.userId;
-
-    // Fetch user's resumes
+    const auth = requireAuth(request);
+    if (auth instanceof NextResponse) return auth;
+    const { userId } = auth;
     const resumes = await prisma.resume.findMany({
       where: { userId: userId },
       orderBy: { createdAt: "desc" },

@@ -1,29 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
-import jwt from "jsonwebtoken";
 import { PrismaClient } from "@prisma/client";
+import { requireAuth } from "@/lib/auth/requireAuth";
 
 const prisma = new PrismaClient();
 
 export async function GET(request: NextRequest) {
   try {
-    // Get the authorization header
-    const authHeader = request.headers.get("authorization");
-    if (!authHeader || !authHeader.startsWith("Bearer ")) {
-      return NextResponse.json({ error: "No token provided" }, { status: 401 });
-    }
-
-    const token = authHeader.substring(7);
-
-    // Verify the JWT token
-    const decoded = jwt.verify(token, process.env.JWT_SECRET!);
-    //for type safety
-    if (typeof decoded === "string" || !("userId" in decoded)) {
-      return NextResponse.json(
-        { success: false, message: "Invalid token payload" },
-        { status: 401 }
-      );
-    }
-    const userId = decoded.userId;
+    const auth = requireAuth(request);
+    if (auth instanceof NextResponse) return auth;
+    const { userId } = auth;
     const user = await prisma.user.findUnique({
       where: { id: userId },
       select: {
@@ -83,7 +68,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json(
       { error: "Failed to update goal" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

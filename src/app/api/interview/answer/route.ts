@@ -1,10 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
-import jwt from "jsonwebtoken";
 import { GoogleGenerativeAI } from "@google/generative-ai";
-
 import { prisma } from "../../../../lib/prisma";
+import { requireAuth } from "@/lib/auth/requireAuth";
+
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
-const JWT_SECRET = process.env.JWT_SECRET!;
 
 // In-memory storage for answers when database is unavailable
 const temporaryAnswers = new Map();
@@ -43,27 +42,9 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Verify authentication
-    const authHeader = request.headers.get("authorization");
-    if (!authHeader || !authHeader.startsWith("Bearer ")) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    const token = authHeader.split(" ")[1];
-    let decoded;
-    try {
-      decoded = jwt.verify(token, JWT_SECRET);
-    } catch (error) {
-      return NextResponse.json({ error: "Invalid token" }, { status: 401 });
-    }
-    //for type safety
-    if (typeof decoded === "string" || !("userId" in decoded)) {
-      return NextResponse.json(
-        { success: false, message: "Invalid token payload" },
-        { status: 401 },
-      );
-    }
-    const userId = decoded.userId;
+    const auth = requireAuth(request);
+    if (auth instanceof NextResponse) return auth;
+    const { userId } = auth;
 
     // Try database first, fallback to temporary storage if database is unavailable
     let savedAnswer;

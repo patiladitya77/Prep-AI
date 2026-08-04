@@ -1,29 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
-import jwt from "jsonwebtoken";
 import { prisma } from "../../../lib/prisma";
+import { requireAuth } from "@/lib/auth/requireAuth";
 import { GoalCategory } from "@prisma/client";
 
 // GET - Fetch all goals for the user
 export async function GET(request: NextRequest) {
   try {
-    // Get the authorization header
-    const authHeader = request.headers.get("authorization");
-    if (!authHeader || !authHeader.startsWith("Bearer ")) {
-      return NextResponse.json({ error: "No token provided" }, { status: 401 });
-    }
-
-    const token = authHeader.substring(7);
-
-    // Verify the JWT token
-    const decoded = jwt.verify(token, process.env.JWT_SECRET!);
-    //for type safety
-    if (typeof decoded === "string" || !("userId" in decoded)) {
-      return NextResponse.json(
-        { success: false, message: "Invalid token payload" },
-        { status: 401 }
-      );
-    }
-    const userId = decoded.userId;
+    const auth = requireAuth(request);
+    if (auth instanceof NextResponse) return auth;
+    const { userId } = auth;
 
     // Check if user exists
     const userExists = await prisma.user.findUnique({
@@ -32,10 +17,8 @@ export async function GET(request: NextRequest) {
 
     if (!userExists) {
       return NextResponse.json(
-        {
-          error: "User session expired. Please log in again.",
-        },
-        { status: 401 }
+        { error: "User session expired. Please log in again." },
+        { status: 401 },
       );
     }
 
@@ -55,7 +38,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json(
       { error: "Failed to update goal" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
@@ -63,24 +46,9 @@ export async function GET(request: NextRequest) {
 // POST - Create a new goal
 export async function POST(request: NextRequest) {
   try {
-    // Get the authorization header
-    const authHeader = request.headers.get("authorization");
-    if (!authHeader || !authHeader.startsWith("Bearer ")) {
-      return NextResponse.json({ error: "No token provided" }, { status: 401 });
-    }
-
-    const token = authHeader.substring(7);
-
-    // Verify the JWT token
-    const decoded = jwt.verify(token, process.env.JWT_SECRET!);
-    //for type safety
-    if (typeof decoded === "string" || !("userId" in decoded)) {
-      return NextResponse.json(
-        { success: false, message: "Invalid token payload" },
-        { status: 401 }
-      );
-    }
-    const userId = decoded.userId;
+    const auth = requireAuth(request);
+    if (auth instanceof NextResponse) return auth;
+    const { userId } = auth;
 
     // Check if user exists
     const userExists = await prisma.user.findUnique({
@@ -89,10 +57,8 @@ export async function POST(request: NextRequest) {
 
     if (!userExists) {
       return NextResponse.json(
-        {
-          error: "User session expired. Please log in again.",
-        },
-        { status: 401 }
+        { error: "User session expired. Please log in again." },
+        { status: 401 },
       );
     }
 
@@ -105,7 +71,7 @@ export async function POST(request: NextRequest) {
         {
           error: "Title, category, and target date are required",
         },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -127,7 +93,7 @@ export async function POST(request: NextRequest) {
         {
           error: "Invalid category",
         },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -154,7 +120,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json(
       { error: "Failed to create goal" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

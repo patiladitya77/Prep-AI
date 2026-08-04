@@ -1,8 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "../../../../lib/prisma";
-import jwt from "jsonwebtoken";
-
-const JWT_SECRET = process.env.JWT_SECRET || "your-secret-key";
+import { requireAuth } from "@/lib/auth/requireAuth";
 
 // Fallback mock questions for when database is unavailable
 const fallbackQuestions = [
@@ -88,33 +86,9 @@ const fallbackQuestions = [
 
 async function GET(request: NextRequest) {
   try {
-    // Get token from Authorization header
-    const authHeader = request.headers.get("authorization");
-
-    if (!authHeader || !authHeader.startsWith("Bearer ")) {
-      return NextResponse.json(
-        { error: "Unauthorized - No token provided" },
-        { status: 401 }
-      );
-    }
-
-    const token = authHeader.substring(7);
-
-    // Verify the JWT token
-    let decoded;
-    try {
-      decoded = jwt.verify(token, JWT_SECRET);
-    } catch (error) {
-      return NextResponse.json({ error: "Invalid token" }, { status: 401 });
-    }
-    //for type safety
-    if (typeof decoded === "string" || !("userId" in decoded)) {
-      return NextResponse.json(
-        { success: false, message: "Invalid token payload" },
-        { status: 401 }
-      );
-    }
-    const userId = decoded.userId;
+    const auth = requireAuth(request);
+    if (auth instanceof NextResponse) return auth;
+    const { userId } = auth;
 
     // Get sessionId from URL parameters
     const { searchParams } = new URL(request.url);
@@ -123,7 +97,7 @@ async function GET(request: NextRequest) {
     if (!sessionId) {
       return NextResponse.json(
         { error: "Missing sessionId parameter" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -151,7 +125,7 @@ async function GET(request: NextRequest) {
       if (!session) {
         return NextResponse.json(
           { error: "Interview session not found or unauthorized" },
-          { status: 404 }
+          { status: 404 },
         );
       }
 
@@ -160,7 +134,7 @@ async function GET(request: NextRequest) {
     } catch (dbError) {
       console.error(
         "❌ Database unavailable, using fallback questions:",
-        dbError
+        dbError,
       );
 
       // Use fallback questions when database is unavailable
@@ -201,7 +175,7 @@ async function GET(request: NextRequest) {
     console.error("Server error:", error);
     return NextResponse.json(
       { error: "Internal server error" },
-      { status: 500 }
+      { status: 500 },
     );
   } finally {
     // keep Prisma client alive across requests in dev/server mode

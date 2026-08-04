@@ -1,39 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
-
-import jwt from "jsonwebtoken";
-
 import { prisma } from "../../../../lib/prisma";
-const JWT_SECRET = process.env.JWT_SECRET || "your-secret-key";
+import { requireAuth } from "@/lib/auth/requireAuth";
 
 async function GET(request: NextRequest) {
   try {
-    // Get token from Authorization header (to match existing auth system)
-    const authHeader = request.headers.get("authorization");
-
-    if (!authHeader || !authHeader.startsWith("Bearer ")) {
-      return NextResponse.json(
-        { error: "Unauthorized - No token provided" },
-        { status: 401 }
-      );
-    }
-
-    const token = authHeader.substring(7); // Remove 'Bearer ' prefix
-
-    // Verify the JWT token
-    let decoded;
-    try {
-      decoded = jwt.verify(token, JWT_SECRET);
-    } catch (error) {
-      return NextResponse.json({ error: "Invalid token" }, { status: 401 });
-    }
-    //for type safety
-    if (typeof decoded === "string" || !("userId" in decoded)) {
-      return NextResponse.json(
-        { success: false, message: "Invalid token payload" },
-        { status: 401 }
-      );
-    }
-    const userId = decoded.userId;
+    const auth = requireAuth(request);
+    if (auth instanceof NextResponse) return auth;
+    const { userId } = auth;
 
     // Check if specific sessionId is requested
     const { searchParams } = new URL(request.url);
@@ -56,7 +29,7 @@ async function GET(request: NextRequest) {
       if (!session) {
         return NextResponse.json(
           { error: "Session not found" },
-          { status: 404 }
+          { status: 404 },
         );
       }
 
@@ -107,13 +80,13 @@ async function GET(request: NextRequest) {
         success: true,
         data: formattedSessions,
       },
-      { status: 200 }
+      { status: 200 },
     );
   } catch (error) {
     console.error("Server error:", error);
     return NextResponse.json(
       { error: "Internal server error" },
-      { status: 500 }
+      { status: 500 },
     );
   } finally {
     // keep Prisma client alive across requests in dev/server mode
