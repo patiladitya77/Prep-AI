@@ -1,16 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "../../../../lib/prisma";
 import { requireAuth } from "@/lib/auth/requireAuth";
-import { generateFeedbackAndScore } from "@/services/scoring";
-
-//helper
-function isJsonObject(data: unknown): data is Record<string, any> {
-  return typeof data === "object" && data !== null && !Array.isArray(data);
-}
-
-// In-memory fallback storage for when the database is unavailable
-const temporaryScores = new Map();
-const temporaryAnswers = new Map();
+import {
+  generateFeedbackAndScore,
+  getGrade,
+  generateOverallFeedback,
+  isJsonObject,
+} from "@/services/scoring";
 
 export async function POST(request: NextRequest) {
   try {
@@ -39,7 +35,6 @@ export async function POST(request: NextRequest) {
     const { userId } = auth;
 
     let finalResults;
-    let usedFallback = false;
 
     try {
       // Get session with all answers and questions from database
@@ -157,81 +152,16 @@ export async function POST(request: NextRequest) {
         completedAt: new Date().toISOString(),
       };
     } catch (dbError) {
-      console.error(
-        "❌ Database unavailable, using fallback calculation:",
-        dbError,
+      console.error("❌ Database unavailable:", dbError);
+      return NextResponse.json(
+        { error: "Database unavailable, please try again" },
+        { status: 503 },
       );
-
-      // Calculate from temporary storage
-      const sessionAnswers = Array.from(temporaryAnswers.keys())
-        .filter((key) => key.startsWith(sessionId))
-        .map((key) => temporaryAnswers.get(key));
-
-      const sessionScores = Array.from(temporaryScores.keys())
-        .filter((key) => key.startsWith(sessionId))
-        .map((key) => temporaryScores.get(key));
-
-      if (sessionAnswers.length === 0) {
-        return NextResponse.json(
-          {
-            success: false,
-            message: "No answers found for this session",
-          },
-          { status: 400 },
-        );
-      }
-
-      const totalQuestions = 10;
-      const answeredQuestions = sessionAnswers.length;
-      const completionPercentage = (answeredQuestions / totalQuestions) * 100;
-
-      // Generate mock results for fallback
-      const questionResults = sessionAnswers.map((answer, index) => {
-        const score =
-          sessionScores.find((s) => s.questionId === answer.questionId)
-            ?.score || Math.floor(Math.random() * 4) + 6;
-
-        return {
-          questionId: answer.questionId,
-          questionText: `Interview Question ${index + 1}`,
-          answer: answer.candidateAnswer,
-          score: score,
-          feedback: `Answer recorded with score ${score}/10 (temporary storage)`,
-          submittedAt: answer.submittedAt,
-        };
-      });
-
-      const totalScore = questionResults.reduce(
-        (sum, result) => sum + result.score,
-        0,
-      );
-      const averageScore = totalScore / questionResults.length;
-
-      finalResults = {
-        sessionId,
-        totalQuestions,
-        answeredQuestions,
-        completionPercentage: parseFloat(completionPercentage.toFixed(1)),
-        overallScore: parseFloat(averageScore.toFixed(1)),
-        grade: getGrade(averageScore),
-        questionResults,
-        overallFeedback:
-          generateOverallFeedback(averageScore, completionPercentage) +
-          " (Demo mode - results not saved)",
-        jobRole: "Software Developer",
-        completedAt: new Date().toISOString(),
-        fallbackMode: true,
-      };
-
-      usedFallback = true;
     }
 
     return NextResponse.json({
       success: true,
-      data: {
-        ...finalResults,
-        fallbackMode: usedFallback,
-      },
+      data: finalResults,
     });
   } catch (error) {
     console.error("❌ Error finishing interview:", error);
@@ -240,37 +170,4 @@ export async function POST(request: NextRequest) {
       { status: 500 },
     );
   }
-}
-
-function getGrade(score: number) {
-  if (score >= 9) return "Excellent";
-  if (score >= 8) return "Good";
-  if (score >= 7) return "Average";
-  if (score >= 6) return "Below Average";
-  return "Needs Improvement";
-}
-
-function generateOverallFeedback(score: number, completion: number) {
-  const grade = getGrade(score);
-  let feedback = `You completed ${completion.toFixed(
-    0,
-  )}% of the interview with an overall score of ${score.toFixed(
-    1,
-  )}/10 (${grade}). `;
-
-  if (score >= 8) {
-    feedback +=
-      "Excellent performance! You demonstrated strong knowledge and communication skills.";
-  } else if (score >= 7) {
-    feedback +=
-      "Good job! You showed solid understanding with room for some improvement.";
-  } else if (score >= 6) {
-    feedback +=
-      "Decent performance. Focus on providing more detailed and specific answers.";
-  } else {
-    feedback +=
-      "There's room for improvement. Practice more and focus on giving comprehensive answers.";
-  }
-
-  return feedback;
 }

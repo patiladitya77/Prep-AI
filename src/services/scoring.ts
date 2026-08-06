@@ -181,3 +181,39 @@ Only return the JSON object, no additional text.
     return getFallbackScore(answer);
   }
 }
+
+export function isJsonObject(data: unknown): data is Record<string, any> {
+  return typeof data === "object" && data !== null && !Array.isArray(data);
+}
+
+export function getGrade(score: number): string {
+  if (score >= 9) return "Excellent";
+  if (score >= 8) return "Good";
+  if (score >= 7) return "Average";
+  if (score >= 6) return "Below Average";
+  return "Needs Improvement";
+}
+
+export function generateOverallFeedback(
+  score: number,
+  completion: number,
+): string {
+  const grade = getGrade(score);
+  let feedback = `You completed ${completion.toFixed(0)}% of the interview with an overall score of ${score.toFixed(1)}/10 (${grade}). `;
+
+  if (score >= 8) {
+    feedback +=
+      "Excellent performance! You demonstrated strong knowledge and communication skills.";
+  } else if (score >= 7) {
+    feedback +=
+      "Good job! You showed solid understanding with room for some improvement.";
+  } else if (score >= 6) {
+    feedback +=
+      "Decent performance. Focus on providing more detailed and specific answers.";
+  } else {
+    feedback +=
+      "There's room for improvement. Practice more and focus on giving comprehensive answers.";
+  }
+
+  return feedback;
+}
