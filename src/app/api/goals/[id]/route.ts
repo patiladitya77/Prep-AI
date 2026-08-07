@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "../../../../lib/prisma";
-import { requireAuth } from "@/lib/auth/requireAuth";
+import { requireAuthWithUser } from "@/lib/auth/requireAuthWithUser";
 import { GoalCategory } from "@prisma/client";
 
 // PUT - Update a goal
@@ -10,21 +10,9 @@ export async function PUT(
 ) {
   try {
     const params = await props.params;
-    const auth = requireAuth(request);
+    const auth = await requireAuthWithUser(request);
     if (auth instanceof NextResponse) return auth;
     const { userId } = auth;
-
-    // Check if user exists
-    const userExists = await prisma.user.findUnique({
-      where: { id: userId },
-    });
-
-    if (!userExists) {
-      return NextResponse.json(
-        { error: "User session expired. Please log in again." },
-        { status: 401 },
-      );
-    }
 
     const goalId = params.id;
     const { title, description, category, targetDate, completed, progress } =
@@ -112,21 +100,9 @@ export async function DELETE(
 ) {
   try {
     const params = await props.params;
-    const auth = requireAuth(request);
+    const auth = await requireAuthWithUser(request);
     if (auth instanceof NextResponse) return auth;
     const { userId } = auth;
-
-    // Check if user exists
-    const userExists = await prisma.user.findUnique({
-      where: { id: userId },
-    });
-
-    if (!userExists) {
-      return NextResponse.json(
-        { error: "User session expired. Please log in again." },
-        { status: 401 },
-      );
-    }
 
     const goalId = params.id;
 

@@ -2,53 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { prisma } from "../../../../lib/prisma";
 import { requireAuth } from "@/lib/auth/requireAuth";
+import { extractTextFromPDF } from "@/lib/pdfExtract";
+
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
-
-// Function to extract text from PDF using Gemini Vision API
-async function extractTextFromPDFWithAI(buffer: Buffer) {
-  try {
-    console.log("📄 Starting PDF text extraction...");
-    console.log("   Buffer size:", buffer.length, "bytes");
-
-    const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
-
-    const prompt = `
-      Please extract all text content from this PDF document. 
-      Return only the plain text content, maintaining the structure and formatting as much as possible.
-      This appears to be a resume/CV document.
-    `;
-
-    console.log("   Calling Gemini API for text extraction...");
-    const result = await model.generateContent([
-      prompt,
-      {
-        inlineData: {
-          mimeType: "application/pdf",
-          data: buffer.toString("base64"),
-        },
-      },
-    ]);
-
-    const extractedText = result.response.text();
-    console.log("✅ PDF text extracted successfully");
-    console.log("   Extracted text length:", extractedText.length, "chars");
-    console.log("   First 200 chars:", extractedText.substring(0, 200));
-    return extractedText;
-  } catch (error) {
-    console.error("❌ PDF text extraction failed:");
-    console.error(
-      "   Error type:",
-      error instanceof Error ? error.constructor.name : typeof error,
-    );
-    console.error(
-      "   Error message:",
-      error instanceof Error ? error.message : String(error),
-    );
-    console.error("   Full error:", error);
-    // Fallback to basic text
-    return "PDF content extraction failed - proceeding with filename analysis";
-  }
-}
 
 // Helper function to parse resume using Gemini AI
 async function parseResumeWithAI(
@@ -237,7 +193,7 @@ async function POST(request: NextRequest) {
     console.log("   File name:", fileNameStr);
     console.log("   File size:", buffer.length, "bytes");
 
-    const extractedText = await extractTextFromPDFWithAI(buffer);
+    const extractedText = await extractTextFromPDF(buffer);
 
     // Parse the extracted text with AI
     let parsedData;

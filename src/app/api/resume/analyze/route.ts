@@ -2,43 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { prisma } from "../../../../lib/prisma";
 import { requireAuth } from "@/lib/auth/requireAuth";
+import { extractTextFromPDF } from "@/lib/pdfExtract";
 
 // Initialize Gemini AI and Prisma
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
-
-// Function to extract text from PDF using Gemini Vision API
-async function extractTextFromPDFWithAI(buffer: Buffer) {
-  try {
-    const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
-
-    const prompt = `
-      Please extract all text content from this PDF document. 
-      Return only the plain text content, maintaining the structure and formatting as much as possible.
-      This appears to be a resume/CV document.
-    `;
-
-    const result = await model.generateContent([
-      prompt,
-      {
-        inlineData: {
-          mimeType: "application/pdf",
-          data: buffer.toString("base64"),
-        },
-      },
-    ]);
-
-    const extractedText = result.response.text();
-    // console.log(
-    //   "📄 PDF text extracted, length:",
-    //   extractedText.length,
-    //   "chars"
-    // );
-    return extractedText;
-  } catch (error) {
-    console.error("PDF AI extraction error:", error);
-    throw new Error("Failed to extract text from PDF using AI");
-  }
-}
 
 export async function POST(request: NextRequest) {
   try {
@@ -210,7 +177,7 @@ Please ensure all scores are realistic and constructive. Provide specific, actio
       // Extract text from PDF using Gemini AI
       let resumeText;
       try {
-        resumeText = await extractTextFromPDFWithAI(Buffer.from(buffer));
+        resumeText = await extractTextFromPDF(Buffer.from(buffer), true);
       } catch (pdfError) {
         console.error("PDF AI extraction error:", pdfError);
         return NextResponse.json(

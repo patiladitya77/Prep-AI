@@ -1,26 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "../../../lib/prisma";
-import { requireAuth } from "@/lib/auth/requireAuth";
+import { requireAuthWithUser } from "@/lib/auth/requireAuthWithUser";
 import { GoalCategory } from "@prisma/client";
 
 // GET - Fetch all goals for the user
 export async function GET(request: NextRequest) {
   try {
-    const auth = requireAuth(request);
+    const auth = await requireAuthWithUser(request);
     if (auth instanceof NextResponse) return auth;
     const { userId } = auth;
-
-    // Check if user exists
-    const userExists = await prisma.user.findUnique({
-      where: { id: userId },
-    });
-
-    if (!userExists) {
-      return NextResponse.json(
-        { error: "User session expired. Please log in again." },
-        { status: 401 },
-      );
-    }
 
     // Fetch goals for the user
     const goals = await prisma.goal.findMany({
@@ -46,21 +34,9 @@ export async function GET(request: NextRequest) {
 // POST - Create a new goal
 export async function POST(request: NextRequest) {
   try {
-    const auth = requireAuth(request);
+    const auth = await requireAuthWithUser(request);
     if (auth instanceof NextResponse) return auth;
     const { userId } = auth;
-
-    // Check if user exists
-    const userExists = await prisma.user.findUnique({
-      where: { id: userId },
-    });
-
-    if (!userExists) {
-      return NextResponse.json(
-        { error: "User session expired. Please log in again." },
-        { status: 401 },
-      );
-    }
 
     // Parse request body
     const { title, description, category, targetDate } = await request.json();
