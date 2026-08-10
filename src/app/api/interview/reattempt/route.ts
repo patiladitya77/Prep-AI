@@ -1,39 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
-
-import jwt from "jsonwebtoken";
-
 import { prisma } from "../../../../lib/prisma";
-const JWT_SECRET = process.env.JWT_SECRET || "your-secret-key";
+import { requireAuth } from "@/lib/auth/requireAuth";
 
 async function POST(request: NextRequest) {
   try {
-    // Get token from Authorization header
-    const authHeader = request.headers.get("authorization");
-
-    if (!authHeader || !authHeader.startsWith("Bearer ")) {
-      return NextResponse.json(
-        { error: "Unauthorized - No token provided" },
-        { status: 401 }
-      );
-    }
-
-    const token = authHeader.substring(7); // Remove 'Bearer ' prefix
-
-    // Verify the JWT token
-    let decoded;
-    try {
-      decoded = jwt.verify(token, JWT_SECRET);
-    } catch (error) {
-      return NextResponse.json({ error: "Invalid token" }, { status: 401 });
-    }
-    //for type safety
-    if (typeof decoded === "string" || !("userId" in decoded)) {
-      return NextResponse.json(
-        { success: false, message: "Invalid token payload" },
-        { status: 401 }
-      );
-    }
-    const userId = decoded.userId;
+    const auth = requireAuth(request);
+    if (auth instanceof NextResponse) return auth;
+    const { userId } = auth;
 
     // Parse the request body
     const body = await request.json();
@@ -43,7 +16,7 @@ async function POST(request: NextRequest) {
     if (!originalSessionId) {
       return NextResponse.json(
         { error: "Missing required field: originalSessionId" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -67,14 +40,14 @@ async function POST(request: NextRequest) {
     if (!originalSession) {
       return NextResponse.json(
         { error: "Original interview session not found or unauthorized" },
-        { status: 404 }
+        { status: 404 },
       );
     }
 
     if (!originalSession.questions || originalSession.questions.length === 0) {
       return NextResponse.json(
         { error: "Original interview session has no questions to re-attempt" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -97,7 +70,7 @@ async function POST(request: NextRequest) {
           questionText: originalQuestion.questionText,
           order: originalQuestion.order,
         },
-      })
+      }),
     );
 
     await Promise.all(questionPromises);
@@ -142,13 +115,13 @@ async function POST(request: NextRequest) {
       }
       return NextResponse.json(
         { error: "Prisma error", details: safeDetails },
-        { status: 500 }
+        { status: 500 },
       );
     }
 
     return NextResponse.json(
       { error: "Failed to re-attempt interview" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

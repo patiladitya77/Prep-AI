@@ -1,39 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "../../../../lib/prisma";
-import jwt from "jsonwebtoken";
-import generateInterviewQuestions from "../../../../services/questionGeneration";
-
-const JWT_SECRET = process.env.JWT_SECRET || "your-secret-key";
+import { requireAuth } from "@/lib/auth/requireAuth";
+import generateInterviewQuestions from "@/services/questionGeneration";
 
 async function POST(request: NextRequest) {
   try {
-    // Get token from Authorization header (to match existing auth system)
-    const authHeader = request.headers.get("authorization");
-
-    if (!authHeader || !authHeader.startsWith("Bearer ")) {
-      return NextResponse.json(
-        { error: "Unauthorized - No token provided" },
-        { status: 401 }
-      );
-    }
-
-    const token = authHeader.substring(7); // Remove 'Bearer ' prefix
-
-    // Verify the JWT token
-    let decoded;
-    try {
-      decoded = jwt.verify(token, JWT_SECRET);
-    } catch (error) {
-      return NextResponse.json({ error: "Invalid token" }, { status: 401 });
-    }
-    //for type safety
-    if (typeof decoded === "string" || !("userId" in decoded)) {
-      return NextResponse.json(
-        { success: false, message: "Invalid token payload" },
-        { status: 401 }
-      );
-    }
-    const userId = decoded.userId;
+    const auth = requireAuth(request);
+    if (auth instanceof NextResponse) return auth;
+    const { userId } = auth;
 
     // Parse the request body
     const body = await request.json();
@@ -52,7 +26,7 @@ async function POST(request: NextRequest) {
           error:
             "Missing required fields: jobRole, jobDescription, experienceYears",
         },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -61,7 +35,7 @@ async function POST(request: NextRequest) {
     if (isNaN(expYears) || expYears < 0) {
       return NextResponse.json(
         { error: "Experience years must be a valid non-negative number" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -82,7 +56,7 @@ async function POST(request: NextRequest) {
       } else {
         return NextResponse.json(
           { error: "Resume not found or unauthorized" },
-          { status: 404 }
+          { status: 404 },
         );
       }
     } else {
@@ -108,7 +82,7 @@ async function POST(request: NextRequest) {
         console.error("Error creating resume:", error);
         return NextResponse.json(
           { error: "Failed to create resume record" },
-          { status: 500 }
+          { status: 500 },
         );
       }
     }
@@ -132,7 +106,7 @@ async function POST(request: NextRequest) {
       console.error("Error creating JD:", error);
       return NextResponse.json(
         { error: "Failed to create job description record" },
-        { status: 500 }
+        { status: 500 },
       );
     }
 
@@ -152,40 +126,13 @@ async function POST(request: NextRequest) {
       });
 
       try {
-        // const questionGenerationResponse = await fetch(
-        //   `${process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000"
-        //   }/api/interview/generate-questions`,
-        //   {
-        //     method: "POST",
-        //     headers: {
-        //       "Content-Type": "application/json",
-        //       Authorization: `Bearer ${token}`,
-        //     },
-        //     body: JSON.stringify({
-        //       sessionId: interviewSession.id,
-        //       jobDescription: jobDescription,
-        //       experienceLevel: expYears,
-        //       jobRole: jobRole,
-        //     }),
-        //   }
-        // );
-        const questionGenerationResponse = await generateInterviewQuestions(
+        await generateInterviewQuestions(
           interviewSession.id,
           jobDescription,
           expYears,
           jobRole,
-          userId
+          userId,
         );
-
-        // if (!questionGenerationResponse.ok) {
-        //   console.error("Failed to generate questions automatically");
-        // }
-        // const questionData = await questionGenerationResponse.json();
-        // if (!questionGenerationResponse.ok) {
-        //   console.error("Failed to generate questions automatically:", questionData);
-        // } else {
-        //   console.log("✅ Questions generated successfully:", questionData?.questions?.length || 0);
-        // }
       } catch (questionError) {
         console.error("Error generating questions:", questionError);
         // Don't fail the session creation if question generation fails
@@ -203,20 +150,20 @@ async function POST(request: NextRequest) {
             experienceYears: expYears,
           },
         },
-        { status: 201 }
+        { status: 201 },
       );
     } catch (error) {
       console.error("Error creating interview session:", error);
       return NextResponse.json(
         { error: "Failed to create interview session" },
-        { status: 500 }
+        { status: 500 },
       );
     }
   } catch (error) {
     console.error("Server error:", error);
     return NextResponse.json(
       { error: "Internal server error" },
-      { status: 500 }
+      { status: 500 },
     );
   } finally {
     // keep Prisma client alive across requests in dev/server mode

@@ -30,7 +30,7 @@ const generateInterviewQuestions = async (
   jobDescription: string,
   experienceLevel: number,
   jobRole: string,
-  userId: string
+  userId: string,
 ) => {
   // Validate required fields
   if (
@@ -69,7 +69,7 @@ const generateInterviewQuestions = async (
     return "questions for this questions already exists";
   }
   try {
-    const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
+    const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
 
     // Prepare resume data for the prompt
     let resumeInfo = "";
@@ -88,7 +88,7 @@ const generateInterviewQuestions = async (
               ? resumeData.experience
                   .map(
                     (exp) =>
-                      `${exp.position} at ${exp.company} (${exp.duration})`
+                      `${exp.position} at ${exp.company} (${exp.duration})`,
                   )
                   .join("; ")
               : "N/A"
@@ -104,7 +104,7 @@ const generateInterviewQuestions = async (
                         Array.isArray(proj.technologies)
                           ? proj.technologies.join(", ")
                           : proj.tech || "N/A"
-                      })`
+                      })`,
                   )
                   .join("; ")
               : "N/A"
@@ -114,7 +114,7 @@ const generateInterviewQuestions = async (
               ? resumeData.education
                   .map(
                     (edu) =>
-                      `${edu.degree} in ${edu.field} from ${edu.institution}`
+                      `${edu.degree} in ${edu.field} from ${edu.institution}`,
                   )
                   .join("; ")
               : "N/A"
@@ -240,7 +240,7 @@ const generateInterviewQuestions = async (
             type: "technical",
             difficulty: "medium",
             focus_area: "Frontend Development",
-          }
+          },
         );
       } else if (
         jobRole.toLowerCase().includes("backend") ||
@@ -259,7 +259,7 @@ const generateInterviewQuestions = async (
             type: "technical",
             difficulty: "medium",
             focus_area: "Database Management",
-          }
+          },
         );
       } else if (
         jobRole.toLowerCase().includes("fullstack") ||
@@ -277,7 +277,7 @@ const generateInterviewQuestions = async (
             type: "technical",
             difficulty: "medium",
             focus_area: "Full-Stack Architecture",
-          }
+          },
         );
       } else {
         // Generic technical questions
@@ -293,7 +293,7 @@ const generateInterviewQuestions = async (
             type: "technical",
             difficulty: "medium",
             focus_area: "Technical Learning",
-          }
+          },
         );
       }
 
@@ -318,7 +318,7 @@ const generateInterviewQuestions = async (
             type: "behavioral",
             difficulty: "easy",
             focus_area: "Learning & Growth",
-          }
+          },
         );
       } else if (experienceLevel <= 5) {
         // Mid-level questions
@@ -340,7 +340,7 @@ const generateInterviewQuestions = async (
             type: "behavioral",
             difficulty: "medium",
             focus_area: "Mentoring & Collaboration",
-          }
+          },
         );
       } else {
         // Senior level questions
@@ -362,7 +362,7 @@ const generateInterviewQuestions = async (
             type: "behavioral",
             difficulty: "hard",
             focus_area: "Strategic Planning",
-          }
+          },
         );
       }
 
@@ -385,7 +385,7 @@ const generateInterviewQuestions = async (
           type: "behavioral",
           difficulty: "easy",
           focus_area: "Professional Development",
-        }
+        },
       );
 
       questionsData = {
@@ -404,7 +404,7 @@ const generateInterviewQuestions = async (
         sessionId: sessionId,
         questionText: q.text,
         order: index + 1,
-      })
+      }),
     );
 
     const createdQuestions = await prisma.question.createMany({

@@ -1,74 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
-import jwt from "jsonwebtoken";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { prisma } from "../../../../lib/prisma";
+import { requireAuth } from "@/lib/auth/requireAuth";
+import { extractTextFromPDF } from "@/lib/pdfExtract";
 
 // Initialize Gemini AI and Prisma
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
 
-// Function to extract text from PDF using Gemini Vision API
-async function extractTextFromPDFWithAI(buffer: Buffer) {
-  try {
-    const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
-
-    const prompt = `
-      Please extract all text content from this PDF document. 
-      Return only the plain text content, maintaining the structure and formatting as much as possible.
-      This appears to be a resume/CV document.
-    `;
-
-    const result = await model.generateContent([
-      prompt,
-      {
-        inlineData: {
-          mimeType: "application/pdf",
-          data: buffer.toString("base64"),
-        },
-      },
-    ]);
-
-    const extractedText = result.response.text();
-    // console.log(
-    //   "📄 PDF text extracted, length:",
-    //   extractedText.length,
-    //   "chars"
-    // );
-    return extractedText;
-  } catch (error) {
-    console.error("PDF AI extraction error:", error);
-    throw new Error("Failed to extract text from PDF using AI");
-  }
-}
-
 export async function POST(request: NextRequest) {
   try {
-    // Check authentication
-    const authHeader = request.headers.get("authorization");
-    if (!authHeader) {
-      return NextResponse.json(
-        { error: "No authorization token provided" },
-        { status: 401 }
-      );
-    }
-
-    const token = authHeader.replace("Bearer ", "");
-    let decoded;
-    try {
-      decoded = jwt.verify(token, process.env.JWT_SECRET!);
-    } catch (error) {
-      return NextResponse.json(
-        { error: "Invalid or expired token" },
-        { status: 401 }
-      );
-    }
-    if (!decoded || typeof decoded !== "object" || !("userId" in decoded)) {
-      return NextResponse.json(
-        { error: "Invalid token payload" },
-        { status: 401 }
-      );
-    }
-
-    const userId = decoded.userId as string;
+    const auth = requireAuth(request);
+    if (auth instanceof NextResponse) return auth;
+    const { userId } = auth as { userId: string };
 
     // Parse the form data
     const formData = await request.formData();
@@ -77,7 +20,7 @@ export async function POST(request: NextRequest) {
     if (!(resumeEntry instanceof File)) {
       return NextResponse.json(
         { error: "Invalid file upload" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -91,7 +34,7 @@ export async function POST(request: NextRequest) {
     if (!resumeFile) {
       return NextResponse.json(
         { error: "Resume file is required" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -103,7 +46,7 @@ export async function POST(request: NextRequest) {
       if (!resumeText.trim()) {
         return NextResponse.json(
           { error: "Resume text cannot be empty" },
-          { status: 400 }
+          { status: 400 },
         );
       }
 
@@ -143,7 +86,7 @@ Please ensure all scores are realistic and constructive. Provide specific, actio
 
       try {
         // Use the stable Gemini Pro model
-        const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
+        const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
         const result = await model.generateContent(textAnalysisPrompt);
         const responseText = result.response.text();
 
@@ -159,19 +102,19 @@ Please ensure all scores are realistic and constructive. Provide specific, actio
           console.error("Failed to parse Gemini response:", responseText);
           return NextResponse.json(
             { error: "Failed to parse AI response. Please try again." },
-            { status: 500 }
+            { status: 500 },
           );
         }
 
         // Ensure scores are within valid range
         analysis.overallScore = Math.max(
           0,
-          Math.min(100, analysis.overallScore)
+          Math.min(100, analysis.overallScore),
         );
         Object.keys(analysis.detailedAnalysis).forEach((key) => {
           analysis.detailedAnalysis[key] = Math.max(
             0,
-            Math.min(100, analysis.detailedAnalysis[key])
+            Math.min(100, analysis.detailedAnalysis[key]),
           );
         });
 
@@ -207,7 +150,7 @@ Please ensure all scores are realistic and constructive. Provide specific, actio
             error:
               "AI analysis service temporarily unavailable. Please try again later.",
           },
-          { status: 503 }
+          { status: 503 },
         );
       }
     } else {
@@ -216,7 +159,7 @@ Please ensure all scores are realistic and constructive. Provide specific, actio
       if (resumeFile.type !== "application/pdf") {
         return NextResponse.json(
           { error: "Only PDF files are supported" },
-          { status: 400 }
+          { status: 400 },
         );
       }
 
@@ -224,7 +167,7 @@ Please ensure all scores are realistic and constructive. Provide specific, actio
       if (resumeFile.size > 10 * 1024 * 1024) {
         return NextResponse.json(
           { error: "File size must be less than 10MB" },
-          { status: 400 }
+          { status: 400 },
         );
       }
 
@@ -234,7 +177,7 @@ Please ensure all scores are realistic and constructive. Provide specific, actio
       // Extract text from PDF using Gemini AI
       let resumeText;
       try {
-        resumeText = await extractTextFromPDFWithAI(Buffer.from(buffer));
+        resumeText = await extractTextFromPDF(Buffer.from(buffer), true);
       } catch (pdfError) {
         console.error("PDF AI extraction error:", pdfError);
         return NextResponse.json(
@@ -242,7 +185,7 @@ Please ensure all scores are realistic and constructive. Provide specific, actio
             error:
               "Failed to extract text from PDF using AI. Please ensure the PDF contains readable text.",
           },
-          { status: 400 }
+          { status: 400 },
         );
       }
 
@@ -252,7 +195,7 @@ Please ensure all scores are realistic and constructive. Provide specific, actio
             error:
               "No text could be extracted from the PDF. Please ensure your resume contains readable text.",
           },
-          { status: 400 }
+          { status: 400 },
         );
       }
 
@@ -300,7 +243,7 @@ Please ensure all scores are realistic and constructive. Provide specific, actio
 
       try {
         // Use the stable Gemini Pro model for PDF analysis
-        const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
+        const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
 
         // Generate content using text analysis (since we extracted text from PDF)
         const result = await model.generateContent(pdfAnalysisPrompt);
@@ -319,19 +262,19 @@ Please ensure all scores are realistic and constructive. Provide specific, actio
           console.error("Failed to parse Gemini response:", responseText);
           return NextResponse.json(
             { error: "Failed to parse AI response. Please try again." },
-            { status: 500 }
+            { status: 500 },
           );
         }
 
         // Ensure scores are within valid range for PDF
         analysis.overallScore = Math.max(
           0,
-          Math.min(100, analysis.overallScore)
+          Math.min(100, analysis.overallScore),
         );
         Object.keys(analysis.detailedAnalysis).forEach((key) => {
           analysis.detailedAnalysis[key] = Math.max(
             0,
-            Math.min(100, analysis.detailedAnalysis[key])
+            Math.min(100, analysis.detailedAnalysis[key]),
           );
         });
 
@@ -339,7 +282,7 @@ Please ensure all scores are realistic and constructive. Provide specific, actio
         try {
           await prisma.resumeAnalysis.create({
             data: {
-              userId: decoded.userId,
+              userId: userId,
               fileName: resumeFile.name || "analyzed_resume.pdf",
               analysisType: "PDF",
               overallScore: analysis.overallScore,
@@ -367,7 +310,7 @@ Please ensure all scores are realistic and constructive. Provide specific, actio
             error:
               "AI analysis service temporarily unavailable. Please try again later.",
           },
-          { status: 503 }
+          { status: 503 },
         );
       }
     }
@@ -375,7 +318,7 @@ Please ensure all scores are realistic and constructive. Provide specific, actio
     console.error("Resume analysis error:", error);
     return NextResponse.json(
       { error: "Internal server error" },
-      { status: 500 }
+      { status: 500 },
     );
   } finally {
     // keep Prisma client alive across requests in dev/server mode

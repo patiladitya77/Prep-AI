@@ -1,8 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import jwt from "jsonwebtoken";
-
 import { prisma } from "../../../../../lib/prisma";
-const JWT_SECRET = process.env.JWT_SECRET!;
+import { requireAuth } from "@/lib/auth/requireAuth";
 interface interviewParams {
   params: Promise<{
     id: string;
@@ -10,33 +8,9 @@ interface interviewParams {
 }
 export async function GET(request: NextRequest, props: interviewParams) {
   try {
-    // Get authorization token
-    const authHeader = request.headers.get("authorization");
-    if (!authHeader || !authHeader.startsWith("Bearer ")) {
-      return NextResponse.json(
-        { error: "Authentication required" },
-        { status: 401 }
-      );
-    }
-
-    const token = authHeader.substring(7);
-    let decoded;
-    try {
-      decoded = jwt.verify(token, JWT_SECRET);
-    } catch (jwtError) {
-      return NextResponse.json(
-        { error: "Invalid authentication token" },
-        { status: 401 }
-      );
-    }
-    //for type safety
-    if (typeof decoded === "string" || !("userId" in decoded)) {
-      return NextResponse.json(
-        { success: false, message: "Invalid token payload" },
-        { status: 401 }
-      );
-    }
-    const userId = decoded.userId;
+    const auth = requireAuth(request);
+    if (auth instanceof NextResponse) return auth;
+    const { userId } = auth;
     const params = await props.params;
     const resumeId = params.id;
 
@@ -58,7 +32,7 @@ export async function GET(request: NextRequest, props: interviewParams) {
     if (!resume) {
       return NextResponse.json(
         { error: "Resume not found or unauthorized" },
-        { status: 404 }
+        { status: 404 },
       );
     }
 
@@ -87,7 +61,7 @@ export async function GET(request: NextRequest, props: interviewParams) {
     console.error("Error fetching resume details:", error);
     return NextResponse.json(
       { error: "Failed to fetch resume details" },
-      { status: 500 }
+      { status: 500 },
     );
   } finally {
     // keep Prisma client alive across requests in dev/server mode

@@ -1,47 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
-import jwt from "jsonwebtoken";
 import { prisma } from "../../../../lib/prisma";
+import { requireAuthWithUser } from "@/lib/auth/requireAuthWithUser";
 import { GoalCategory } from "@prisma/client";
 
 // PUT - Update a goal
 export async function PUT(
   request: NextRequest,
-  props: { params: Promise<{ id: string }> }
+  props: { params: Promise<{ id: string }> },
 ) {
   try {
     const params = await props.params;
-    // Get the authorization header
-    const authHeader = request.headers.get("authorization");
-    if (!authHeader || !authHeader.startsWith("Bearer ")) {
-      return NextResponse.json({ error: "No token provided" }, { status: 401 });
-    }
-
-    const token = authHeader.substring(7);
-
-    // Verify the JWT token
-    const decoded = jwt.verify(token, process.env.JWT_SECRET!);
-    //for type safety
-    if (typeof decoded === "string" || !("userId" in decoded)) {
-      return NextResponse.json(
-        { success: false, message: "Invalid token payload" },
-        { status: 401 }
-      );
-    }
-    const userId = decoded.userId;
-
-    // Check if user exists
-    const userExists = await prisma.user.findUnique({
-      where: { id: userId },
-    });
-
-    if (!userExists) {
-      return NextResponse.json(
-        {
-          error: "User session expired. Please log in again.",
-        },
-        { status: 401 }
-      );
-    }
+    const auth = await requireAuthWithUser(request);
+    if (auth instanceof NextResponse) return auth;
+    const { userId } = auth;
 
     const goalId = params.id;
     const { title, description, category, targetDate, completed, progress } =
@@ -95,7 +66,7 @@ export async function PUT(
       if (!goalCategory) {
         return NextResponse.json(
           { error: "Invalid category" },
-          { status: 400 }
+          { status: 400 },
         );
       }
       updateData.category = goalCategory as GoalCategory;
@@ -117,7 +88,7 @@ export async function PUT(
 
     return NextResponse.json(
       { error: "Failed to update goal" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
@@ -125,42 +96,13 @@ export async function PUT(
 // DELETE - Delete a goal
 export async function DELETE(
   request: NextRequest,
-  props: { params: Promise<{ id: string }> }
+  props: { params: Promise<{ id: string }> },
 ) {
   try {
     const params = await props.params;
-    // Get the authorization header
-    const authHeader = request.headers.get("authorization");
-    if (!authHeader || !authHeader.startsWith("Bearer ")) {
-      return NextResponse.json({ error: "No token provided" }, { status: 401 });
-    }
-
-    const token = authHeader.substring(7);
-
-    // Verify the JWT token
-    const decoded = jwt.verify(token, process.env.JWT_SECRET!);
-    //for type safety
-    if (typeof decoded === "string" || !("userId" in decoded)) {
-      return NextResponse.json(
-        { success: false, message: "Invalid token payload" },
-        { status: 401 }
-      );
-    }
-    const userId = decoded.userId;
-
-    // Check if user exists
-    const userExists = await prisma.user.findUnique({
-      where: { id: userId },
-    });
-
-    if (!userExists) {
-      return NextResponse.json(
-        {
-          error: "User session expired. Please log in again.",
-        },
-        { status: 401 }
-      );
-    }
+    const auth = await requireAuthWithUser(request);
+    if (auth instanceof NextResponse) return auth;
+    const { userId } = auth;
 
     const goalId = params.id;
 
@@ -188,7 +130,7 @@ export async function DELETE(
 
     return NextResponse.json(
       { error: "Failed to update goal" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
