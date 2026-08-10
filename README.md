@@ -7,12 +7,11 @@
 [![Next.js](https://img.shields.io/badge/Next.js-15-black?logo=next.js)](https://nextjs.org/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.9-blue?logo=typescript)](https://www.typescriptlang.org/)
 [![Prisma](https://img.shields.io/badge/Prisma-6-2D3748?logo=prisma)](https://www.prisma.io/)
-[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-Neon-336791?logo=postgresql)](https://neon.tech/)
-[![Redis](https://img.shields.io/badge/Redis-Upstash-DC382D?logo=redis)](https://upstash.com/)
+[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-336791?logo=postgresql)](https://www.postgresql.org/)
 [![Gemini AI](https://img.shields.io/badge/Gemini-2.5_Flash-4285F4?logo=google)](https://ai.google.dev/)
 [![License](https://img.shields.io/badge/License-MIT-green)](LICENSE)
 
-PrepAI helps job seekers practice technical and behavioral interviews with personalized AI-generated questions, real-time proctoring, and detailed performance analytics — all powered by Google Gemini.
+An AI-powered interview preparation platform that generates personalized interview questions, provides real-time proctoring, and delivers detailed performance analytics — all powered by Google Gemini AI.
 
 </div>
 
@@ -20,11 +19,11 @@ PrepAI helps job seekers practice technical and behavioral interviews with perso
 
 ## Overview
 
-PrepAI is a full-stack SaaS platform that simulates real job interviews. Users upload their resume and a job description, and the system generates 10 highly personalized interview questions using Google Gemini AI. During the interview, a real-time proctoring system monitors the candidate via webcam using MediaPipe FaceMesh — detecting tab switches, gaze direction, and multiple faces. After the session, every answer is scored and critiqued by Gemini, producing a detailed results report with strengths, improvements, and an overall grade.
+PrepAI is a full-stack platform that simulates realistic job interviews. Upload your resume and job description, and the system generates 10 personalized interview questions using Google Gemini AI. During the interview, a real-time proctoring system monitors candidates using MediaPipe FaceMesh for face detection, gaze tracking, and tab-switch detection. After completion, Gemini scores each answer with detailed feedback, strengths, improvements, and an overall grade.
 
-The platform also includes a standalone resume analyzer that scores resumes across five dimensions and provides actionable feedback, optionally matched against a specific job description.
+The platform includes a resume analyzer that scores resumes across five dimensions with actionable feedback, and can be matched against specific job descriptions.
 
-**Target users:** Software engineers, CS students, and career switchers preparing for technical interviews.
+**Target users:** Software engineers, CS students, and professionals preparing for technical and behavioral interviews.
 
 ---
 
@@ -32,52 +31,54 @@ The platform also includes a standalone resume analyzer that scores resumes acro
 
 ### AI Interview Engine
 
-- Generates 10 personalized questions per session using the candidate's resume + job description
-- Questions are tailored by role (frontend, backend, fullstack, etc.) and experience level (0–2, 3–5, 5+ years)
-- Difficulty scales automatically: fundamentals for juniors, system design for seniors
-- Behavioral and technical question mix (2:1 ratio)
-- Fallback question sets if Gemini is unavailable
+- Generates 10 personalized questions per session based on resume and job description
+- Questions tailored by role (frontend, backend, fullstack) and experience level (0-2, 3-5, 5+ years)
+- Automatic difficulty scaling: fundamentals for juniors, system design for seniors
+- Mix of behavioral and technical questions (1:2 ratio)
+- Fallback question sets if AI is unavailable
 
 ### Real-Time Proctoring
 
-- MediaPipe FaceMesh detects face presence, gaze direction, and multiple faces in frame
-- Tab-switch and window-blur detection with keyboard shortcut blocking (DevTools, Alt+Tab, etc.)
+- MediaPipe FaceMesh detects face presence, eye detection, and gaze direction
+- Multiple face detection with warnings
+- Tab-switch and window-blur detection
+- Keyboard shortcut blocking (DevTools, Alt+Tab)
 - Configurable warning threshold (default: 3 warnings → auto-terminate)
-- Continuous look-away detection with configurable timeout
-- Calibration period before monitoring begins
+- Continuous look-away detection with timeout
+- 5-second calibration period before monitoring starts
 
 ### Answer Evaluation
 
-- Each answer scored 1–10 by Gemini with detailed feedback
-- Returns structured strengths, improvements, and overall feedback
-- Rate-limited API calls (8/min) with graceful fallback scoring based on answer length/quality
-- Session finalization calculates overall score, grade, and completion percentage
+- Each answer scored 1-10 by Gemini with detailed feedback
+- Structured strengths, improvements, and overall feedback per answer
+- Rate-limited API calls with graceful fallback scoring
+- Overall session scoring and grading
 
 ### Resume Analysis
 
 - Upload PDF or paste plain text
-- Gemini extracts and parses resume into structured JSON (name, skills, experience, projects, education)
+- Gemini parses resume into structured JSON
 - Scores across 5 dimensions: formatting, content, skills, experience, keywords
-- Optional job description matching for targeted gap analysis
-- Analysis history stored per user
+- Optional job description matching for gap analysis
+- Analysis history per user
 
 ### Analytics Dashboard
 
 - Interview history with scores and trends
 - Monthly progress charts (Chart.js)
-- Skills performance breakdown from JD data
+- Skills performance breakdown
 - Resume analysis history with per-dimension scores
 
 ### Goals Tracking
 
 - Create goals across 4 categories: INTERVIEW, LEARNING, PRACTICE, RESUME
-- Track progress (0–100%) and completion status
+- Progress tracking (0-100%)
 - Target date management
 
 ### Authentication
 
 - Email/password with bcrypt hashing
-- Google OAuth 2.0 (authorization code flow)
+- Google OAuth 2.0
 - JWT-based sessions (7-day expiry)
 - Password reset via token-based email flow
 
@@ -85,12 +86,12 @@ The platform also includes a standalone resume analyzer that scores resumes acro
 
 - Free tier: 5 interviews, 6 resume uploads
 - Premium tier: 20 interviews, 20 resume uploads
-- Upgrade flow with checkout page
+- Upgrade flow
 
 ### Question Bank
 
-- Browse AI-generated practice questions by category: frontend, backend, devops, mobile
-- Questions include difficulty level, estimated answer time, and topic tags
+- Browse AI-generated practice questions by category
+- Questions include difficulty level and topic tags
 
 ---
 
@@ -104,17 +105,12 @@ graph TB
         MediaPipe[MediaPipe FaceMesh]
     end
 
-    subgraph Server["Next.js API Routes (Edge/Node)"]
+    subgraph Server["Next.js API Routes"]
         AuthAPI[Auth API]
         InterviewAPI[Interview API]
         ResumeAPI[Resume API]
         AnalyticsAPI[Analytics API]
         GoalsAPI[Goals API]
-    end
-
-    subgraph Queue["Background Worker"]
-        BullMQ[BullMQ Queue]
-        Worker[Question Worker]
     end
 
     subgraph AI["Google Gemini 2.5 Flash"]
@@ -125,8 +121,7 @@ graph TB
     end
 
     subgraph Data["Data Layer"]
-        Postgres[(Neon PostgreSQL)]
-        Redis[(Upstash Redis)]
+        Postgres[(PostgreSQL)]
     end
 
     UI --> AuthAPI
@@ -135,12 +130,7 @@ graph TB
     UI --> AnalyticsAPI
     UI --> GoalsAPI
 
-    InterviewAPI -->|add job| BullMQ
-    BullMQ --> Redis
-    Redis --> Worker
-    Worker --> QGen
-    Worker --> Postgres
-
+    InterviewAPI --> QGen
     InterviewAPI --> Scoring
     ResumeAPI --> ResumeParse
     ResumeAPI --> ResumeAnalyze
@@ -154,69 +144,24 @@ graph TB
     MediaPipe -->|proctoring events| UI
 ```
 
-### Data Flow: Interview Session
-
-```mermaid
-sequenceDiagram
-    participant U as User
-    participant FE as Frontend
-    participant API as Next.js API
-    participant Q as BullMQ/Redis
-    participant W as Question Worker
-    participant AI as Gemini AI
-    participant DB as PostgreSQL
-
-    U->>FE: Fill setup form (role, JD, experience)
-    FE->>API: POST /api/interview/create
-    API->>DB: Create Resume, JD, InterviewSession records
-    API->>Q: Enqueue question-generation job
-    API-->>FE: Return sessionId
-
-    Q->>W: Dequeue job
-    W->>AI: Generate 10 personalized questions
-    AI-->>W: JSON questions array
-    W->>DB: Save questions to session
-
-    FE->>API: Poll /api/interview/questions
-    API-->>FE: Return questions when ready
-
-    loop For each question
-        U->>FE: Record/type answer
-        FE->>API: POST /api/interview/answer
-        API->>DB: Save answer
-    end
-
-    U->>FE: Finish interview
-    FE->>API: POST /api/interview/finish
-    API->>AI: Score each answer (Gemini)
-    AI-->>API: Score + feedback per answer
-    API->>DB: Update answers + session (COMPLETED)
-    API-->>FE: Full results with grades
-```
-
----
-
 ## Tech Stack
 
-| Category            | Technology                                                     |
-| ------------------- | -------------------------------------------------------------- |
-| **Framework**       | Next.js 15 (App Router)                                        |
-| **Language**        | TypeScript 5.9, JavaScript                                     |
-| **UI**              | React 19, Tailwind CSS 4, Framer Motion, Radix UI, Headless UI |
-| **Charts**          | Chart.js, react-chartjs-2                                      |
-| **Icons**           | Lucide React, Heroicons                                        |
-| **Auth**            | JWT (jsonwebtoken), bcryptjs, Google OAuth 2.0                 |
-| **Database**        | PostgreSQL (Neon serverless)                                   |
-| **ORM**             | Prisma 6                                                       |
-| **Queue**           | BullMQ 5                                                       |
-| **Cache/Broker**    | Redis (Upstash, via ioredis)                                   |
-| **AI**              | Google Gemini 2.5 Flash (`@google/generative-ai`)              |
-| **Computer Vision** | MediaPipe FaceMesh (`@mediapipe/face_mesh`)                    |
-| **PDF Processing**  | Gemini Vision API (multimodal PDF ingestion)                   |
-| **Speech**          | react-hook-speech-to-text (browser Web Speech API)             |
-| **Webcam**          | react-webcam                                                   |
-| **PDF Export**      | jsPDF                                                          |
-| **Dev Tools**       | ESLint, Nodemon, ts-node, concurrently                         |
+| Category            | Technology                                         |
+| ------------------- | -------------------------------------------------- |
+| **Framework**       | Next.js 15 (App Router)                            |
+| **Language**        | TypeScript 5.9                                     |
+| **UI**              | React 19, Tailwind CSS 4, Framer Motion, Radix UI  |
+| **Charts**          | Chart.js, react-chartjs-2                          |
+| **Icons**           | Lucide React, Heroicons                            |
+| **Auth**            | JWT, bcryptjs, Google OAuth 2.0                    |
+| **Database**        | PostgreSQL                                         |
+| **ORM**             | Prisma 6                                           |
+| **AI**              | Google Gemini 2.5 Flash                            |
+| **Computer Vision** | MediaPipe FaceMesh                                 |
+| **PDF Processing**  | Gemini Vision API (multimodal PDF ingestion)       |
+| **Speech**          | react-hook-speech-to-text (Browser Web Speech API) |
+| **Webcam**          | react-webcam                                       |
+| **PDF Export**      | jsPDF                                              |
 
 ---
 
@@ -225,74 +170,60 @@ sequenceDiagram
 ```
 prep-ai/
 ├── prisma/
-│   ├── schema.prisma          # Database models and relations
-│   └── migrations/            # Versioned SQL migration history
+│   ├── schema.prisma          # Database models
+│   └── migrations/            # SQL migration history
 │
 ├── src/
 │   ├── app/                   # Next.js App Router
-│   │   ├── api/               # All API route handlers
-│   │   │   ├── auth/          # login, signup, logout, me, google OAuth, password reset
-│   │   │   ├── interview/     # create, answer, finish, score, questions, sessions, terminate
-│   │   │   ├── resume/        # upload, analyze, details, delete
-│   │   │   ├── analytics/     # Interview + resume analytics aggregation
-│   │   │   ├── goals/         # CRUD for user goals
-│   │   │   ├── questions/     # AI question bank generation by category
-│   │   │   ├── speech-to-text/# Speech transcription endpoint
-│   │   │   └── user/          # Usage stats, upgrade to premium
+│   │   ├── api/               # API route handlers
+│   │   │   ├── auth/          # Authentication endpoints
+│   │   │   ├── interview/     # Interview session management
+│   │   │   ├── resume/        # Resume upload & analysis
+│   │   │   ├── analytics/     # Analytics aggregation
+│   │   │   ├── goals/         # Goals CRUD
+│   │   │   ├── questions/     # Question bank
+│   │   │   └── user/          # User management
 │   │   │
-│   │   ├── home/              # Authenticated app shell
-│   │   │   ├── dashboard/     # Overview + recent sessions
-│   │   │   ├── analytics/     # Charts and performance trends
-│   │   │   ├── goals/         # Goal management UI
+│   │   ├── home/              # Authenticated app
+│   │   │   ├── dashboard/     # Overview & recent sessions
+│   │   │   ├── analytics/     # Performance trends
+│   │   │   ├── goals/         # Goal management
 │   │   │   ├── profile/       # User profile
-│   │   │   ├── questions/     # Question bank browser
-│   │   │   └── upload-resume/ # Resume upload and details
+│   │   │   ├── questions/     # Question browser
+│   │   │   └── upload-resume/ # Resume management
 │   │   │
 │   │   ├── interview/
-│   │   │   ├── setup/         # Interview configuration form
-│   │   │   └── [interviewId]/ # Live interview + results page
+│   │   │   ├── setup/         # Interview configuration
+│   │   │   └── [interviewId]/ # Live interview & results
 │   │   │
-│   │   ├── resume-check/      # Standalone resume analyzer
-│   │   ├── pricing/           # Pricing page
-│   │   ├── checkout/          # Upgrade checkout
-│   │   ├── login/             # Auth pages
-│   │   ├── signup/
-│   │   ├── forgot-password/
-│   │   └── reset-password/
+│   │   └── ... (auth, resume-check, pricing, checkout)
 │   │
 │   ├── components/
-│   │   ├── interview/         # InterviewUI, RecordAnswerSection, PreparingInterview,
-│   │   │                      # InterviewMonitoringDisplay, WarningModal, Avatar
-│   │   ├── dashboard/         # PreviousInterviewCard, UsageProgress
-│   │   ├── resume/            # ResumeUpload, ResumeDisplay
-│   │   ├── navigation/        # Sidebar, LeftNav, NavBar
-│   │   ├── miscellaneous/     # Pricing, AuthProviderWrapper
-│   │   └── ui/                # Shared primitives (Button, Card, Dialog, Input, Progress)
+│   │   ├── interview/         # Interview UI components
+│   │   ├── dashboard/         # Dashboard components
+│   │   ├── resume/            # Resume components
+│   │   ├── navigation/        # Nav components
+│   │   └── ui/                # Shared UI primitives
 │   │
 │   ├── context/
-│   │   └── AuthContext.tsx    # Global auth state (JWT + user, localStorage persistence)
+│   │   └── AuthContext.tsx    # Global auth state
 │   │
 │   ├── hooks/
-│   │   ├── useInterviewMonitoring.ts  # MediaPipe proctoring hook
-│   │   ├── useGoals.ts                # Goals CRUD hook
-│   │   └── useUsageStats.ts           # Usage limits hook
+│   │   ├── useInterviewMonitoring.ts  # Proctoring hook
+│   │   ├── useGoals.ts                # Goals management
+│   │   └── useUsageStats.ts           # Usage tracking
 │   │
 │   ├── lib/
-│   │   ├── prisma.ts          # Singleton Prisma client
-│   │   ├── auth/helpers.js    # hashPassword, comparePassword, generateToken, validators
-│   │   └── queue/
-│   │       ├── queue.ts       # BullMQ queue definition
-│   │       └── workers/
-│   │           └── questionworker.ts  # Background question generation worker
+│   │   ├── prisma.ts          # Prisma client
+│   │   └── auth/              # Auth utilities
 │   │
 │   ├── services/
-│   │   └── questionGeneration.ts  # Core Gemini question generation service
+│   │   └── questionGeneration.ts  # AI question generation
 │   │
 │   └── utils/
-│       └── interviewCache.ts  # Client-side interview state caching
+│       └── interviewCache.ts  # Client-side caching
 │
-├── dist-worker/               # Compiled worker output (tsc)
-├── public/docs/               # Architecture diagrams (ER diagram, system architecture)
+├── public/docs/               # Architecture diagrams
 ├── next.config.ts
 ├── tsconfig.json
 └── package.json
@@ -339,6 +270,22 @@ prep-ai/
   "jobDescription": "We are looking for...",
   "experienceYears": 4,
   "existingResumeId": "clx123abc"
+}
+```
+
+**Response:**
+
+```json
+{
+  "success": true,
+  "message": "Interview session created successfully",
+  "data": {
+    "sessionId": "clx...",
+    "jdId": "clx...",
+    "resumeId": "clx...",
+    "jobRole": "Senior Frontend Engineer",
+    "experienceYears": 4
+  }
 }
 ```
 
@@ -511,19 +458,18 @@ erDiagram
 ### Prerequisites
 
 - Node.js 20+
-- PostgreSQL database (or [Neon](https://neon.tech) free tier)
-- Redis instance ([Upstash](https://upstash.com) free tier works)
+- PostgreSQL database
 - Google Gemini API key ([Google AI Studio](https://aistudio.google.com))
 - Google OAuth credentials ([Google Cloud Console](https://console.cloud.google.com))
 
 ### Environment Variables
 
-Create a `.env` file in the project root:
+Create a `.env` file:
 
 ```env
-# Database (Neon PostgreSQL or any PostgreSQL)
-DATABASE_URL="postgresql://user:password@host/dbname?sslmode=require"
-DIRECT_URL="postgresql://user:password@host/dbname?sslmode=require"
+# Database
+DATABASE_URL="postgresql://user:password@host/dbname"
+DIRECT_URL="postgresql://user:password@host/dbname"
 
 # JWT
 JWT_SECRET="your-secure-random-secret-min-32-chars"
@@ -535,9 +481,6 @@ GEMINI_API_KEY="your-gemini-api-key"
 # Google OAuth
 GOOGLE_CLIENT_ID="your-google-client-id"
 GOOGLE_CLIENT_SECRET="your-google-client-secret"
-
-# Redis (Upstash or local)
-REDIS_URL="rediss://default:password@host:port"
 
 # App
 NEXT_PUBLIC_BASE_URL="http://localhost:3000"
@@ -560,44 +503,23 @@ npm run db:generate
 # Run database migrations
 npm run db:migrate
 
-# (Optional) Open Prisma Studio to inspect data
+# (Optional) Open Prisma Studio
 npm run db:studio
 ```
 
 ### Running Locally
 
-You need two processes running simultaneously: the Next.js dev server and the BullMQ question worker.
-
-**Terminal 1 — Next.js app:**
-
 ```bash
 npm run dev
 ```
 
-**Terminal 2 — Question generation worker:**
-
-```bash
-npm run worker
-```
-
 The app will be available at `http://localhost:3000`.
-
-> The worker must be running for interview question generation to work. Without it, questions will remain pending after session creation.
 
 ### Build for Production
 
 ```bash
-# Build Next.js app
 npm run build
-
-# Build the worker
-npm run worker:build
-
-# Start the app
 npm start
-
-# Start the worker (in a separate process/container)
-node dist-worker/lib/queue/workers/questionWorker.js
 ```
 
 ---
@@ -606,19 +528,16 @@ node dist-worker/lib/queue/workers/questionWorker.js
 
 ### Recommended Stack
 
-| Service                        | Purpose                            |
-| ------------------------------ | ---------------------------------- |
-| [Vercel](https://vercel.com)   | Next.js app hosting (serverless)   |
-| [Neon](https://neon.tech)      | Serverless PostgreSQL              |
-| [Upstash](https://upstash.com) | Serverless Redis (BullMQ broker)   |
-| VPS / Railway / Render         | Long-running BullMQ worker process |
+| Service                      | Purpose             |
+| ---------------------------- | ------------------- |
+| [Vercel](https://vercel.com) | Next.js app hosting |
+| PostgreSQL provider          | Database            |
 
-### Important Notes
+### Deployment Notes
 
-- The BullMQ worker is a **long-running Node.js process** and cannot run on Vercel serverless functions. Deploy it separately on a VPS, Railway, or Render.
-- Set all environment variables in your hosting provider's dashboard.
-- For Google OAuth, add your production domain to the authorized redirect URIs in Google Cloud Console: `https://yourdomain.com/api/auth/google/callback`.
-- Neon requires both `DATABASE_URL` (pooled) and `DIRECT_URL` (direct connection for migrations).
+- Set all environment variables in your hosting provider's dashboard
+- For Google OAuth, add your production domain to authorized redirect URIs: `https://yourdomain.com/api/auth/google/callback`
+- Ensure `DATABASE_URL` and `DIRECT_URL` are properly configured
 
 ---
 
@@ -626,51 +545,46 @@ node dist-worker/lib/queue/workers/questionWorker.js
 
 ```mermaid
 flowchart TD
-    A[User uploads resume PDF] --> B[Gemini Vision: Extract text from PDF]
-    B --> C[Gemini: Parse text into structured JSON]
-    C --> D[Store parsedData in Resume record]
+    A[User uploads resume PDF] --> B[Gemini Vision: Extract text]
+    B --> C[Gemini: Parse to structured JSON]
+    C --> D[Store in Resume record]
 
-    E[User creates interview session] --> F[BullMQ: Enqueue question-generation job]
-    F --> G[Worker picks up job from Redis]
-    G --> H{Resume data available?}
-    H -->|Yes| I[Build personalized prompt with resume + JD]
-    H -->|No| J[Build generic prompt with JD only]
-    I --> K[Gemini 2.5 Flash: Generate 10 questions as JSON]
-    J --> K
-    K --> L{Parse JSON response}
-    L -->|Success| M[Save questions to DB]
-    L -->|Failure| N[Use role/experience fallback questions]
-    N --> M
+    E[User creates interview] --> F[API generates questions immediately]
+    F --> G{Resume data available?}
+    G -->|Yes| H[Build personalized prompt]
+    G -->|No| I[Build generic prompt]
+    H --> J[Gemini: Generate 10 questions]
+    I --> J
+    J --> K{Parse JSON?}
+    K -->|Success| L[Save questions to DB]
+    K -->|Failure| M[Use fallback questions]
+    M --> L
 
-    O[User submits answer] --> P[Save answer to DB]
+    N[User submits answer] --> O[Save to DB]
 
-    Q[User finishes interview] --> R[For each question+answer]
-    R --> S[Gemini: Score 1-10 + feedback + strengths + improvements]
-    S --> T{Rate limit OK?}
-    T -->|Yes| U[AI scoring]
-    T -->|No| V[Fallback: length-based scoring]
-    U --> W[Update Answer record in DB]
-    V --> W
-    W --> X[Calculate average score + grade]
-    X --> Y[Mark session COMPLETED]
-    Y --> Z[Return full results to client]
+    P[User finishes interview] --> Q[For each answer]
+    Q --> R[Gemini: Score + feedback]
+    R --> S[Update Answer record]
+    S --> T[Calculate average score]
+    T --> U[Mark COMPLETED]
+    U --> V[Return results]
 ```
 
 ---
 
 ## Proctoring System
 
-The `useInterviewMonitoring` hook implements a multi-layer integrity system:
+The `useInterviewMonitoring` hook implements multi-layer integrity monitoring:
 
-| Detection Type             | Mechanism                          | Warning Trigger                            |
-| -------------------------- | ---------------------------------- | ------------------------------------------ |
-| Tab switch                 | `visibilitychange` + `blur` events | Immediate on hide/blur                     |
-| Long tab absence           | Duration tracking                  | Additional warning if away > 2s            |
-| Face not detected          | MediaPipe FaceMesh                 | After 5s of no face                        |
-| Eyes closed / looking away | Landmark gaze analysis             | After 8–15s                                |
-| Multiple faces             | FaceMesh `maxNumFaces: 4`          | Immediate, 10s cooldown                    |
-| Continuous look-away       | Duration tracking                  | After configurable threshold (default 60s) |
-| Keyboard shortcuts         | `keydown` event blocking           | Immediate warning + toast                  |
+| Detection Type             | Mechanism                   | Warning Trigger                 |
+| -------------------------- | --------------------------- | ------------------------------- |
+| Tab switch                 | `visibilitychange` + `blur` | Immediate                       |
+| Long tab absence           | Duration tracking           | Additional warning if away > 2s |
+| Face not detected          | MediaPipe FaceMesh          | After 5s                        |
+| Eyes closed / looking away | Landmark gaze analysis      | After 8-15s                     |
+| Multiple faces             | FaceMesh face count         | Immediate, 10s cooldown         |
+| Continuous look-away       | Duration tracking           | After threshold (default 60s)   |
+| Keyboard shortcuts         | `keydown` event blocking    | Immediate                       |
 
 After `maxWarnings` (default: 3), the session is automatically terminated.
 
@@ -680,8 +594,8 @@ After `maxWarnings` (default: 3), the session is automatically terminated.
 
 1. Fork the repository
 2. Create a feature branch: `git checkout -b feature/your-feature`
-3. Commit your changes: `git commit -m 'Add your feature'`
-4. Push to the branch: `git push origin feature/your-feature`
+3. Commit changes: `git commit -m 'Add your feature'`
+4. Push to branch: `git push origin feature/your-feature`
 5. Open a Pull Request
 
 ---
