@@ -73,7 +73,7 @@ export default function Home() {
   };
 
   const handleGoToSignup = () => {
-    router.push("/signup");
+    router.push("/login");
   };
 
   const handleGoToLogin = () => {
@@ -355,8 +355,8 @@ export default function Home() {
                                 <p className="text-3xl font-bold text-green-600">
                                   {isAuthenticated && analyticsData
                                     ? `${Math.round(
-                                        analyticsData.averageScore
-                                      )}%`
+                                      analyticsData.averageScore
+                                    )}%`
                                     : "89%"}
                                 </p>
                                 <p className="text-sm text-gray-600 mt-2">
@@ -388,8 +388,8 @@ export default function Home() {
                               </h3>
                               <div className="space-y-3">
                                 {isAuthenticated &&
-                                analyticsData &&
-                                analyticsData.recentInterviews.length > 0 ? (
+                                  analyticsData &&
+                                  analyticsData.recentInterviews.length > 0 ? (
                                   analyticsData.recentInterviews
                                     .slice(0, 3)
                                     .map((interview, index) => (
@@ -404,24 +404,23 @@ export default function Home() {
                                             )}`}
                                         </span>
                                         <span
-                                          className={`px-2 py-1 rounded text-sm ${
-                                            interview.status === "COMPLETED"
+                                          className={`px-2 py-1 rounded text-sm ${interview.status === "COMPLETED"
                                               ? "bg-green-100 text-green-800"
                                               : interview.status ===
                                                 "IN_PROGRESS"
-                                              ? "bg-blue-100 text-blue-800"
-                                              : "bg-yellow-100 text-yellow-800"
-                                          }`}
+                                                ? "bg-blue-100 text-blue-800"
+                                                : "bg-yellow-100 text-yellow-800"
+                                            }`}
                                         >
                                           {interview.status === "COMPLETED"
                                             ? `Score: ${Math.round(
-                                                interview.score || 0
-                                              )}%`
+                                              interview.score || 0
+                                            )}%`
                                             : interview.status.charAt(0) +
-                                              interview.status
-                                                .slice(1)
-                                                .toLowerCase()
-                                                .replace("_", " ")}
+                                            interview.status
+                                              .slice(1)
+                                              .toLowerCase()
+                                              .replace("_", " ")}
                                         </span>
                                       </div>
                                     ))
