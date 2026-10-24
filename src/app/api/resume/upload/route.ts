@@ -153,7 +153,6 @@ async function POST(request: NextRequest) {
           data: {
             id: userId,
             email: `user-${userId}@temp.com`,
-            passwordHash: "temp-hash",
             name: "User",
           },
         });
@@ -255,13 +254,10 @@ async function POST(request: NextRequest) {
 
       return NextResponse.json({
         success: true,
-        message: `Resume "${fileName}" uploaded and parsed successfully! Extracted ${
-          parsedData.skills?.length || 0
-        } skills, ${parsedData.projects?.length || 0} projects, ${
-          parsedData.experience?.length || 0
-        } work experiences, and ${
-          parsedData.education?.length || 0
-        } education entries.`,
+        message: `Resume "${fileName}" uploaded and parsed successfully! Extracted ${parsedData.skills?.length || 0
+          } skills, ${parsedData.projects?.length || 0} projects, ${parsedData.experience?.length || 0
+          } work experiences, and ${parsedData.education?.length || 0
+          } education entries.`,
         resume: {
           id: resume.id,
           fileName: resume.file_name,

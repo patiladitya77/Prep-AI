@@ -1,17 +1,13 @@
 "use client";
 import { useRouter } from "next/navigation";
-import React, { useState, useEffect } from "react";
+import React, { useEffect } from "react";
 import toast from "react-hot-toast";
 import { useAuth } from "@/context/AuthContext";
-import { PageLoading, ButtonLoading } from "@/components/ui/Loading";
+import { PageLoading } from "@/components/ui/Loading";
 
 export default function Login() {
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [errorMessage, setErrorMessage] = useState("");
-  const [isLoading, setIsLoading] = useState(false);
   const router = useRouter();
-  const { login, isAuthenticated, isLoading: authLoading } = useAuth();
+  const { isAuthenticated, isLoading: authLoading } = useAuth();
 
   // Redirect if already authenticated
   useEffect(() => {
@@ -20,152 +16,76 @@ export default function Login() {
     }
   }, [isAuthenticated, authLoading, router]);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsLoading(true);
-    setErrorMessage("");
-    toast.loading("🔐 Logging in...", { id: "login-progress" });
-
-    try {
-      const response = await fetch("/api/auth/login", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ email, password }),
-      });
-
-      const data = await response.json();
-
-      if (data.success) {
-        // Update AuthContext with login data
-        login(data.data.token, data.data.user);
-
-        toast.success(" Login successful! Welcome back!", {
-          id: "login-progress",
-        });
-        router.push("/home/dashboard");
-      } else {
-        toast.error(data.message || " Login failed. Please try again.", {
-          id: "login-progress",
-        });
-        setErrorMessage(data.message || "Login failed. Please try again.");
-      }
-    } catch (error) {
-      toast.error(
-        "❌ Network error. Please check your connection and try again.",
-        { id: "login-progress" }
-      );
-      setErrorMessage(
-        "Network error. Please check your connection and try again."
-      );
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  // Show loading while checking auth status
+  // Show loading while checking authentication
   if (authLoading) {
     return <PageLoading text="Checking authentication..." />;
   }
 
-  // Don't render login form if already authenticated
+  // Don't render login page if already authenticated
   if (isAuthenticated) {
     return null;
   }
 
+  const handleGoogleLogin = () => {
+    toast.loading("Redirecting to Google...", {
+      id: "google-login",
+    });
+
+    window.location.href = "/api/auth/google";
+  };
+
   return (
     <div className="flex items-center justify-center min-h-screen bg-white bg-opacity-20">
       <div className="w-full max-w-sm bg-white rounded-xl shadow-lg p-6">
-        <div className="mb-4 text-center">
-          <h2 className="text-xl font-bold">Login to your account</h2>
+        <div className="mb-6 text-center">
+          <h2 className="text-xl font-bold">
+            Login to your account
+          </h2>
           <p className="text-sm text-gray-500 mt-1">
-            Enter your email below to login to your account
+            Continue with Google to access your account
           </p>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="flex flex-col gap-1">
-            <label htmlFor="email" className="text-sm font-medium">
-              Email
-            </label>
-            <input
-              id="email"
-              type="email"
-              className="p-2 border rounded-lg bg-gray-50 focus:outline-none focus:ring-2 focus:ring-black"
-              placeholder="m@example.com"
-              required
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              suppressHydrationWarning
-            />
-          </div>
-
-          <div className="flex flex-col gap-1">
-            <div className="flex justify-between items-center">
-              <label htmlFor="password" className="text-sm font-medium">
-                Password
-              </label>
-              <a href="/forgot-password" className="text-xs hover:underline">
-                Forgot your password?
-              </a>
-            </div>
-            <input
-              id="password"
-              type="password"
-              className="p-2 border rounded-lg bg-gray-50 focus:outline-none focus:ring-2 focus:ring-black"
-              required
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              suppressHydrationWarning
-            />
-          </div>
-
-          {errorMessage && (
-            <p className="text-red-500 text-sm font-medium">{errorMessage}</p>
-          )}
-
-          <div className="flex flex-col gap-2">
-            <button
-              type="submit"
-              disabled={isLoading}
-              className={`w-full p-2 rounded-lg text-white font-medium ${
-                isLoading
-                  ? "bg-gray-400 cursor-not-allowed"
-                  : "bg-black hover:bg-gray-800"
-              }`}
-              suppressHydrationWarning
+        <button
+          type="button"
+          onClick={handleGoogleLogin}
+          className="w-full p-3 border rounded-lg hover:bg-gray-100 transition-colors font-medium"
+        >
+          <span className="flex items-center justify-center gap-2">
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              width="20"
+              height="20"
+              viewBox="0 0 48 48"
+              aria-hidden="true"
             >
-              {isLoading ? (
-                <div className="flex items-center justify-center space-x-2">
-                  <ButtonLoading />
-                  <span>Logging in...</span>
-                </div>
-              ) : (
-                "Login"
-              )}
-            </button>
-            <button
-              type="button"
-              disabled={isLoading}
-              onClick={() => {
-                // Redirect to server endpoint that starts Google OAuth
-                window.location.href = "/api/auth/google";
-              }}
-              className="w-full p-2 border rounded-lg hover:bg-gray-100 disabled:opacity-50 cursor-pointer"
-              suppressHydrationWarning
-            >
-              Continue with Google
-            </button>
-          </div>
+              <path
+                fill="#EA4335"
+                d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 3.16 13.22l7.98 6.19C13.03 13.72 18.06 9.5 24 9.5Z"
+                transform="translate(0 4)"
+              />
+              <path
+                fill="#4285F4"
+                d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.76 7.18l7.73 6C44.42 37.92 46.98 31.73 46.98 24.55Z"
+              />
+              <path
+                fill="#FBBC05"
+                d="M10.53 28.59A14.4 14.4 0 0 1 9.75 24c0-1.59.27-3.13.76-4.59l-7.98-6.19A23.9 23.9 0 0 0 0 24c0 3.87.93 7.52 2.56 10.78l7.97-6.19Z"
+                transform="translate(1 0)"
+              />
+              <path
+                fill="#34A853"
+                d="M24 48c6.48 0 11.93-2.13 15.91-5.8l-7.73-6c-2.15 1.45-4.9 2.3-8.18 2.3-5.94 0-10.97-4.22-12.86-9.91l-7.98 6.19C6.51 43.62 14.62 48 24 48Z"
+                transform="translate(0 -4)"
+              />
+            </svg>
+            Continue with Google
+          </span>
+        </button>
 
-          <p className="text-center text-sm mt-4">
-            New here?{" "}
-            <a href="/signup" className="text-blue-600 hover:underline">
-              Sign Up
-            </a>
-          </p>
-        </form>
+        <p className="text-center text-sm text-gray-500 mt-5">
+          Sign in securely with your Google account.
+        </p>
       </div>
     </div>
   );

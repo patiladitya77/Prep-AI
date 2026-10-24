@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { generateToken, hashPassword } from "@/lib/auth/helpers";
-import crypto from "crypto";
+import { generateToken } from "@/lib/auth/helpers";
 
 import { prisma } from "../../../../../lib/prisma";
 
@@ -65,12 +64,13 @@ async function GET(request: NextRequest) {
       where: { email: email.toLowerCase() },
     });
     if (!user) {
-      // Create user with random password
-      const randomPassword = crypto.randomBytes(32).toString("hex");
-      const passwordHash = await hashPassword(randomPassword);
       user = await prisma.user.create({
-        data: { email: email.toLowerCase(), name: name, passwordHash },
+        data: {
+          email: email.toLowerCase(),
+          name: name,
+        },
       });
+
     }
 
     const token = generateToken(user.id);

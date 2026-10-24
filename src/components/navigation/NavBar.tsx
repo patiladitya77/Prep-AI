@@ -37,7 +37,7 @@ const NavBar = () => {
   };
 
   const handleGoToSignup = () => {
-    router.push("/signup");
+    router.push("/login");
   };
 
   const handleLogout = async () => {
@@ -98,7 +98,7 @@ const NavBar = () => {
             {/* Practice Dropdown */}
             <div className="absolute left-0 mt-2 w-48 bg-white rounded-md shadow-lg border border-gray-200 py-1 z-50 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200">
               <a
-                href={isAuthenticated ? "/home/dashboard" : "/signup"}
+                href={isAuthenticated ? "/home/dashboard" : "/login"}
                 className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
               >
                 Mock Interviews
@@ -119,7 +119,7 @@ const NavBar = () => {
                   router.push("/");
                 }
               } else {
-                router.push("/signup");
+                router.push("/login");
               }
             }}
             className="text-gray-600 hover:text-gray-900 transition-colors cursor-pointer"
@@ -133,8 +133,8 @@ const NavBar = () => {
               if (pricingSection) {
                 pricingSection.scrollIntoView({ behavior: "smooth" });
               } else {
-                // For now, redirect to signup
-                router.push("/signup");
+                // For now, redirect to login
+                router.push("/login");
               }
             }}
             className="text-gray-600 hover:text-gray-900 transition-colors cursor-pointer"
@@ -271,7 +271,7 @@ const NavBar = () => {
           <div className="px-6 py-4 space-y-4">
             <div>
               <a
-                href={isAuthenticated ? "/home/dashboard" : "/signup"}
+                href={isAuthenticated ? "/home/dashboard" : "/login"}
                 className="block text-sm font-medium text-gray-900 hover:text-blue-600"
               >
                 Mock Interviews
@@ -291,7 +291,7 @@ const NavBar = () => {
                     router.push("/");
                   }
                 } else {
-                  router.push("/signup");
+                  router.push("/login");
                 }
                 setShowMobileMenu(false);
               }}
@@ -306,7 +306,7 @@ const NavBar = () => {
                 if (pricingSection) {
                   pricingSection.scrollIntoView({ behavior: "smooth" });
                 } else {
-                  router.push("/signup");
+                  router.push("/login");
                 }
                 setShowMobileMenu(false);
               }}
@@ -328,7 +328,7 @@ const NavBar = () => {
                 </button>
                 <button
                   onClick={() => {
-                    router.push("/signup");
+                    router.push("/login");
                     setShowMobileMenu(false);
                   }}
                   className="w-full bg-black text-white px-4 py-2 rounded-md hover:bg-gray-800 transition-colors text-sm font-medium"
